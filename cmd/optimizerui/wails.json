@@ -1,0 +1,12 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Optimizer",
+  "outputfilename": "Optimizer",
+  "frontend:install": "",
+  "frontend:build": "",
+  "info": {
+    "productName": "Optimizer",
+    "productVersion": "0.1.0",
+    "comments": "Otimizador de PC que mede antes de mexer e deixa desfazer sempre."
+  }
+}

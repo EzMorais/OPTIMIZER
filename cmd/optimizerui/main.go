@@ -1,10 +1,49 @@
+// Comando optimizerui é o app desktop do Optimizer.
+//
+// A interface é HTML/CSS/JS embutida no .exe (Wails v2, sem CGO). Toda a lógica
+// continua no Go compilado: o frontend não decide nada, só pede e mostra.
 package main
 
-import "fmt"
+import (
+	"context"
+	"embed"
+	"log"
 
-// Este é um placeholder. O próximo passo de implementação é rodar
-// `wails init` nesta pasta para gerar o esqueleto real do app desktop
-// (ver docs/arquitetura-app-desktop.md, seção 1).
+	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/options"
+	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	wailswin "github.com/wailsapp/wails/v2/pkg/options/windows"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+)
+
+//go:embed all:frontend/dist
+var assets embed.FS
+
 func main() {
-	fmt.Println("Optimizer — em desenvolvimento")
+	app := NewApp()
+
+	err := wails.Run(&options.App{
+		Title:            "Optimizer",
+		Width:            1120,
+		Height:           780,
+		MinWidth:         900,
+		MinHeight:        620,
+		AssetServer:      &assetserver.Options{Assets: assets},
+		BackgroundColour: &options.RGBA{R: 13, G: 16, B: 18, A: 1},
+		OnStartup:        app.startup,
+		Bind:             []any{app},
+		Windows: &wailswin.Options{
+			WebviewIsTransparent: false,
+			WindowIsTranslucent:  false,
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func encerrar(ctx context.Context) {
+	if ctx != nil {
+		runtime.Quit(ctx)
+	}
 }

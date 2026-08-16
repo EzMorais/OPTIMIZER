@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optimizer</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>
+    Optimizer
+  </div>
+
+  <div class="profiles" role="tablist" aria-label="Perfil">
+    <button class="prof on" data-perfil="pessoal">Pessoal</button>
+    <button class="prof" data-perfil="trabalho">Trabalho</button>
+  </div>
+
+  <div class="admin" id="admin-area"></div>
+</header>
+
+<nav class="tabs">
+  <button class="tab on" data-view="otim">Otimizações</button>
+  <button class="tab" data-view="rede">Internet</button>
+  <button class="tab" data-view="hist">Histórico</button>
+</nav>
+
+<main>
+  <!-- ------------------------------------------------ otimizações -->
+  <section id="view-otim" class="view on">
+    <div class="summary" id="resumo">
+      <div class="sum-main"><span class="spin"></span> Lendo o estado do seu computador…</div>
+    </div>
+
+    <div class="list" id="lista"></div>
+  </section>
+
+  <!-- ------------------------------------------------------- rede -->
+  <section id="view-rede" class="view">
+    <div class="card intro">
+      <h2>Teste de internet</h2>
+      <p>
+        Descobrimos o maior pacote que a sua conexão realmente entrega sem precisar quebrar no meio
+        do caminho. É a mesma técnica do <code>ping -f -l</code> do Windows — e mostramos o comando
+        para você conferir na mão.
+      </p>
+      <div class="inline">
+        <label>Testar até
+          <input id="destino" type="text" value="8.8.8.8" spellcheck="false">
+        </label>
+        <button class="btn primary" id="btn-medir">Medir agora</button>
+      </div>
+      <p class="muted small">Não altera nada. Leva alguns segundos.</p>
+    </div>
+
+    <div id="mtu-resultado"></div>
+  </section>
+
+  <!-- --------------------------------------------------- histórico -->
+  <section id="view-hist" class="view">
+    <div class="card intro">
+      <h2>Histórico</h2>
+      <p>Tudo que este app já alterou nesta máquina. O arquivo é texto simples — você pode abrir e ler.</p>
+      <div class="inline">
+        <button class="btn" id="btn-abrir-hist">Abrir arquivo</button>
+        <button class="btn danger" id="btn-desfazer-tudo-2">Desfazer tudo</button>
+      </div>
+      <p class="muted small" id="hist-caminho"></p>
+    </div>
+    <div id="hist-lista"></div>
+  </section>
+</main>
+
+<footer class="actions" id="barra">
+  <label class="chk" id="wrap-restauracao" hidden>
+    <input type="checkbox" id="ponto-restauracao">
+    <span>Criar ponto de restauração antes</span>
+  </label>
+  <div class="grow"></div>
+  <button class="btn" id="btn-recomendados">Marcar recomendados</button>
+  <button class="btn" id="btn-simular">Simular</button>
+  <button class="btn primary" id="btn-aplicar">Aplicar selecionados</button>
+  <button class="btn danger" id="btn-desfazer-tudo">Desfazer tudo</button>
+</footer>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="modal">
+    <h3 id="modal-titulo">Resultado</h3>
+    <div id="modal-corpo"></div>
+    <div class="modal-acoes"><button class="btn primary" id="modal-fechar">Fechar</button></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

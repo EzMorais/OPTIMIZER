@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optimizer — otimizador de PC que mede antes de mexer</title>
+<meta name="description" content="Otimizador de Windows que mede de verdade, explica em português claro e deixa desfazer tudo. App desktop em Go, com perfis separados para uso pessoal e computador de trabalho.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f7f8f7;
+  --bg-elev:#ffffff;
+  --bg-sunken:#eceeec;
+  --ink:#14171a;
+  --ink-2:#4a5257;
+  --ink-3:#6f787e;
+  --line:#dce0dd;
+  --accent:#0f7a5a;
+  --accent-soft:#e3f2ec;
+  --warn:#8a5a12;
+  --warn-soft:#fbf1de;
+  --code-bg:#12171a;
+  --code-ink:#d7e0dc;
+  --radius:14px;
+  --maxw:1080px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1012;
+    --bg-elev:#151a1d;
+    --bg-sunken:#0a0d0e;
+    --ink:#eef2f0;
+    --ink-2:#a9b4b1;
+    --ink-3:#7d8a87;
+    --line:#242c30;
+    --accent:#3ecf9a;
+    --accent-soft:#12281f;
+    --warn:#e0b366;
+    --warn-soft:#2a2113;
+    --code-bg:#080b0c;
+    --code-ink:#cfdad5;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1012;
+  --bg-elev:#151a1d;
+  --bg-sunken:#0a0d0e;
+  --ink:#eef2f0;
+  --ink-2:#a9b4b1;
+  --ink-3:#7d8a87;
+  --line:#242c30;
+  --accent:#3ecf9a;
+  --accent-soft:#12281f;
+  --warn:#e0b366;
+  --warn-soft:#2a2113;
+  --code-bg:#080b0c;
+  --code-ink:#cfdad5;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+  font-size:17px;
+  line-height:1.6;
+  overflow-x:hidden;
+}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px}
+section{padding:68px 0;border-top:1px solid var(--line)}
+section:first-of-type{border-top:0}
+h1,h2,h3{line-height:1.2;letter-spacing:-.02em;margin:0}
+h2{font-size:clamp(1.5rem,3.4vw,2.1rem);margin-bottom:12px}
+h3{font-size:1.05rem;margin-bottom:6px}
+p{margin:0 0 14px}
+.lead{color:var(--ink-2);max-width:62ch}
+.eyebrow{
+  font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:14px
+}
+a{color:var(--accent)}
+
+/* ---------- hero ---------- */
+.hero{padding:76px 0 60px;border:0}
+.mark{
+  display:inline-flex;align-items:center;gap:10px;
+  font-weight:700;letter-spacing:-.01em;font-size:1.05rem;margin-bottom:38px
+}
+.mark svg{display:block}
+.hero h1{font-size:clamp(2.1rem,6vw,3.5rem);max-width:16ch;margin-bottom:20px}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero .lead{font-size:clamp(1.02rem,2.2vw,1.2rem);max-width:56ch}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:28px}
+.tag{
+  font-size:.8rem;padding:5px 11px;border-radius:999px;
+  border:1px solid var(--line);color:var(--ink-2);background:var(--bg-elev)
+}
+.tag.on{border-color:transparent;background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+/* ---------- panel (diagnóstico) ---------- */
+.panel{
+  margin-top:44px;background:var(--bg-elev);border:1px solid var(--line);
+  border-radius:var(--radius);overflow:hidden
+}
+.panel-head{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:14px 18px;border-bottom:1px solid var(--line);background:var(--bg-sunken)
+}
+.panel-head strong{font-size:.92rem}
+.panel-head span{font-size:.8rem;color:var(--ink-3)}
+.row{
+  display:grid;grid-template-columns:26px 1fr auto;gap:14px;align-items:baseline;
+  padding:13px 18px;border-bottom:1px solid var(--line)
+}
+.row:last-child{border-bottom:0}
+.row .state{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:.9rem;color:var(--ink-3)}
+.row.ok .state{color:var(--accent)}
+.row .name{font-weight:600;font-size:.95rem}
+.row .why{display:block;font-weight:400;color:var(--ink-2);font-size:.86rem;margin-top:2px}
+.row .num{
+  font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:.8rem;
+  color:var(--ink-3);white-space:nowrap
+}
+.panel-foot{
+  padding:14px 18px;font-size:.88rem;color:var(--ink-2);background:var(--bg-sunken);
+  border-top:1px solid var(--line)
+}
+.panel-foot b{color:var(--ink)}
+
+/* ---------- grids ---------- */
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));margin-top:34px}
+.card{
+  background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);
+  padding:22px
+}
+.card .ico{
+  width:34px;height:34px;border-radius:9px;display:grid;place-items:center;
+  background:var(--accent-soft);color:var(--accent);margin-bottom:14px
+}
+.card p{margin:0;color:var(--ink-2);font-size:.93rem}
+.card .premium{
+  display:inline-block;margin-top:12px;font-size:.7rem;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--warn);background:var(--warn-soft);
+  padding:3px 8px;border-radius:6px
+}
+
+/* ---------- refusals ---------- */
+.refuse{display:grid;gap:10px;margin-top:30px}
+.refuse div{
+  display:flex;gap:13px;align-items:flex-start;padding:14px 16px;
+  border:1px dashed var(--line);border-radius:11px;background:var(--bg-elev)
+}
+.refuse .x{color:var(--ink-3);font-family:ui-monospace,Consolas,monospace;flex:none;padding-top:1px}
+.refuse b{font-weight:650}
+.refuse span.t{color:var(--ink-2);font-size:.93rem}
+
+/* ---------- terminal ---------- */
+.term{
+  margin-top:28px;background:var(--code-bg);color:var(--code-ink);border-radius:var(--radius);
+  border:1px solid var(--line);overflow:hidden
+}
+.term-bar{
+  padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.09);
+  font-size:.76rem;letter-spacing:.06em;text-transform:uppercase;color:#7f8f89
+}
+.term pre{
+  margin:0;padding:18px 16px;overflow-x:auto;
+  font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:.83rem;line-height:1.65
+}
+.term .g{color:#54d6a3}
+.term .d{color:#7d8f89}
+
+/* ---------- table ---------- */
+.tablewrap{overflow-x:auto;margin-top:30px;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg-elev)}
+table{border-collapse:collapse;width:100%;min-width:440px;font-size:.93rem}
+th,td{padding:13px 18px;text-align:left;border-bottom:1px solid var(--line)}
+tbody tr:last-child td{border-bottom:0}
+th{font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+td.c,th.c{text-align:center;width:120px}
+.yes{color:var(--accent);font-weight:700}
+.no{color:var(--ink-3)}
+
+/* ---------- price ---------- */
+.price{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.price div{
+  border:1px solid var(--line);background:var(--bg-elev);border-radius:11px;
+  padding:14px 18px;min-width:132px
+}
+.price span{display:block;font-size:.76rem;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase}
+.price b{font-size:1.22rem;letter-spacing:-.02em}
+
+/* ---------- status ---------- */
+.steps{margin-top:30px;display:grid;gap:2px}
+.step{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;padding:15px 0;border-bottom:1px solid var(--line)}
+.step:last-child{border-bottom:0}
+.dot{
+  width:11px;height:11px;border-radius:50%;background:var(--accent);margin-top:8px;
+  box-shadow:0 0 0 4px var(--accent-soft)
+}
+.step.todo .dot{background:transparent;border:2px solid var(--line);box-shadow:none}
+.step .t{font-weight:600;font-size:.97rem}
+.step .s{color:var(--ink-2);font-size:.9rem}
+
+footer{padding:44px 0 60px;border-top:1px solid var(--line);color:var(--ink-3);font-size:.87rem}
+footer p{margin:0 0 6px}
+
+@media (max-width:640px){
+  body{font-size:16px}
+  section{padding:52px 0}
+  .row{grid-template-columns:22px 1fr;gap:10px}
+  .row .num{grid-column:2;white-space:normal}
+}
+</style>
+</head>
+<body>
+
+<header class="wrap hero">
+  <div class="mark">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/>
+    </svg>
+    Optimizer
+  </div>
+
+  <h1>Mede antes de mexer. E deixa <em>desfazer</em> sempre.</h1>
+
+  <p class="lead">
+    Otimizador de PC para Windows que mostra o número que mediu, explica cada ajuste em
+    português claro e nunca cobra pelo botão de voltar atrás.
+  </p>
+
+  <div class="tags">
+    <span class="tag on">Motor funcionando</span>
+    <span class="tag">App desktop em Go</span>
+    <span class="tag">Assinatura semanal ou mensal</span>
+    <span class="tag">Perfis Pessoal e Trabalho</span>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <strong>Diagnóstico</strong>
+      <span>leitura real de uma máquina Windows 11</span>
+    </div>
+
+    <div class="row ok">
+      <span class="state">[x]</span>
+      <span class="name">Efeitos de transparência
+        <span class="why">A transparência já está desligada.</span>
+      </span>
+      <span class="num">nada a fazer</span>
+    </div>
+    <div class="row">
+      <span class="state">[ ]</span>
+      <span class="name">Abrir menus na hora
+        <span class="why">Os menus ainda esperam um tempo antes de abrir.</span>
+      </span>
+      <span class="num">medido: 100 · alvo: 10</span>
+    </div>
+    <div class="row">
+      <span class="state">[ ]</span>
+      <span class="name">Desligar a gravação de jogos em segundo plano
+        <span class="why">O Windows mantém um gravador rodando por trás.</span>
+      </span>
+      <span class="num">medido: 1 · alvo: 0</span>
+    </div>
+    <div class="row ok">
+      <span class="state">[x]</span>
+      <span class="name">Mouse sem aceleração
+        <span class="why">Já está no modo 1:1.</span>
+      </span>
+      <span class="num">nada a fazer</span>
+    </div>
+
+    <div class="panel-foot">
+      <b>4 de 9 itens já estão como você quer.</b> 2 otimizações recomendadas ainda não aplicadas.
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section class="wrap">
+  <div class="eyebrow">O problema</div>
+  <h2>“Encontramos 3.847 problemas no seu PC”</h2>
+  <p class="lead">
+    A categoria inteira funciona assim: assusta com um número inventado, cobra para consertar o
+    básico e nunca conta o que mudou nem como voltar atrás. O concorrente mais forte hoje é
+    gratuito e oficial — o Microsoft PC Manager —, mas ele não automatiza nada de forma contínua
+    e trata computador de trabalho igual a computador pessoal.
+  </p>
+  <p class="lead">
+    <strong>É aí que este produto entra:</strong> medir de verdade, mostrar o risco e cobrar pela
+    automação e pelas duas abas — nunca pelo diagnóstico nem pelo desfazer.
+  </p>
+</section>
+
+<section class="wrap">
+  <div class="eyebrow">O que o app faz</div>
+  <h2>Sete coisas, sem enrolação</h2>
+
+  <div class="grid">
+    <article class="card">
+      <div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div>
+      <h3>Diagnóstico com número real</h3>
+      <p>Lê o estado atual da máquina e mostra o que mediu. Se o PC está bem, o app diz que está bem.</p>
+    </article>
+
+    <article class="card">
+      <div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="7" width="20" height="10" rx="5"/><circle cx="16" cy="12" r="3" fill="currentColor" stroke="none"/></svg></div>
+      <h3>Um interruptor por ajuste</h3>
+      <p>Cada otimização explica o que faz, qual o risco e — quando o ganho é pequeno — vem desmarcada dizendo por quê.</p>
+    </article>
+
+    <article class="card">
+      <div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3.5 13a9 9 0 1 0 2.3-9.3L3 7"/></svg></div>
+      <h3>Desfazer sempre, de graça</h3>
+      <p>Ponto de restauração antes de qualquer mudança e histórico de tudo. Um clique volta ao estado anterior exato.</p>
+    </article>
+
+    <article class="card">
+      <div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="9" height="16" rx="2"/><rect x="13" y="4" width="9" height="16" rx="2"/></svg></div>
+      <h3>Duas abas: Pessoal e Trabalho</h3>
+      <p>No perfil de trabalho a barra é mais alta: nada que a TI da empresa possa depender é tocado. Nenhum concorrente tem isso.</p>
+    </article>
+
+    <article class="card">
+      <div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13a10 10 0 0 1 14 0"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg></div>
+      <h3>Teste de internet que mede</h3>
+      <p>Descobre o tamanho máximo de pacote que a sua conexão realmente entrega — e mostra o comando para você conferir na mão.</p>
+    </article>
+
+    <article class="card">
+      <div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg></div>
+      <h3>Automação contínua</h3>
+      <p>O app mantém o perfil escolhido sozinho, em segundo plano, sem o usuário precisar abrir nada.</p>
+      <span class="premium">Premium</span>
+    </article>
+
+    <article class="card">
+      <div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16.5 10 13h4l3-4.5"/></svg></div>
+      <h3>Corretor de rotas</h3>
+      <p>Hub ao vivo de rota e latência para jogos e chamadas, na linha do que ExitLag e NoPing fazem.</p>
+      <span class="premium">Premium</span>
+    </article>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="eyebrow">Diferencial</div>
+  <h2>O que o app se recusa a fazer</h2>
+  <p class="lead">
+    Tem uma lista de “otimizações” famosas que ficam de fora — e cada uma vem com a explicação
+    de por quê. É argumento de venda, não omissão.
+  </p>
+
+  <div class="refuse">
+    <div><span class="x">✕</span><span class="t"><b>Desligar proteções de segurança da CPU.</b> Ganho pequeno, risco real. Não vale a troca.</span></div>
+    <div><span class="x">✕</span><span class="t"><b>Limpeza de registro.</b> Não existe teste confiável mostrando ganho. Só existe risco.</span></div>
+    <div><span class="x">✕</span><span class="t"><b>Desfragmentar SSD.</b> Não acelera nada e gasta a vida útil do disco à toa.</span></div>
+    <div><span class="x">✕</span><span class="t"><b>Os “20% de internet escondidos”.</b> Mito de vinte anos atrás. O Windows não guarda nada.</span></div>
+    <div><span class="x">✕</span><span class="t"><b>Contador inflado de problemas.</b> Se o seu PC está bem, a gente diz que está bem.</span></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="eyebrow">Prova</div>
+  <h2>Achou uma diferença real — e disse que dava para ignorar</h2>
+  <p class="lead">
+    O teste de internet mediu que a conexão entrega menos do que a placa está configurada.
+    Um app da categoria transformaria isso em alerta vermelho. Este aqui olhou o motivo,
+    viu que o Windows já estava se ajustando sozinho e classificou o ajuste como opcional.
+  </p>
+
+  <div class="term">
+    <div class="term-bar">Teste de internet</div>
+<pre>O adaptador "Ethernet" está em MTU 1500 e o caminho até 8.8.8.8 aceita 1480 —
+mas a rede avisa corretamente quando o pacote é grande demais, e o Windows já
+se ajusta sozinho.
+
+<span class="d">Confira você mesmo no Prompt de Comando:</span>
+  ping -n 1 -f -l 1452 8.8.8.8   <span class="g">→ responde normalmente</span>
+  ping -n 1 -f -l 1453 8.8.8.8   <span class="d">→ "Pacote precisa ser fragmentado,
+                                    mas o sinalizador DF está definido."</span>
+
+Ajuste sugerido: MTU de "Ethernet" → 1480
+<span class="g">Este ajuste é OPCIONAL: a medição mostrou que o Windows já está se
+adaptando sozinho neste caminho.</span></pre>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="eyebrow">Planos</div>
+  <h2>O básico é grátis. Paga-se pelo automático.</h2>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Recurso</th><th class="c">Grátis</th><th class="c">Premium</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Diagnóstico completo</td><td class="c yes">●</td><td class="c yes">●</td></tr>
+        <tr><td>Todas as otimizações manuais</td><td class="c yes">●</td><td class="c yes">●</td></tr>
+        <tr><td>Ponto de restauração e desfazer</td><td class="c yes">●</td><td class="c yes">●</td></tr>
+        <tr><td>Teste de internet</td><td class="c yes">●</td><td class="c yes">●</td></tr>
+        <tr><td>Automação contínua</td><td class="c no">—</td><td class="c yes">●</td></tr>
+        <tr><td>Duas abas ao mesmo tempo</td><td class="c no">—</td><td class="c yes">●</td></tr>
+        <tr><td>Histórico completo</td><td class="c no">—</td><td class="c yes">●</td></tr>
+        <tr><td>Corretor de rotas</td><td class="c no">—</td><td class="c yes">●</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="price">
+    <div><span>Semanal</span><b>R$ 7,90</b></div>
+    <div><span>Mensal</span><b>R$ 19,90</b></div>
+    <div><span>Anual</span><b>R$ 149,90</b></div>
+    <div><span>Empresarial</span><b>R$ 14,90<small> /máquina</small></b></div>
+  </div>
+  <p class="lead" style="margin-top:16px;font-size:.9rem">
+    Hipótese de preço, ainda a validar. Pagamento por PIX e cartão.
+  </p>
+</section>
+
+<section class="wrap">
+  <div class="eyebrow">Onde estamos</div>
+  <h2>O motor já funciona</h2>
+
+  <div class="steps">
+    <div class="step"><span class="dot"></span><span>
+      <span class="t">Pesquisa de mercado e catálogo técnico</span>
+      <span class="s">Concorrentes, licenças e o veredito de cada otimização: o que é real, o que é placebo, o que é perigoso.</span>
+    </span></div>
+    <div class="step"><span class="dot"></span><span>
+      <span class="t">Motor de otimização</span>
+      <span class="s">Diagnostica, aplica, confirma que a alteração pegou, registra e desfaz. Testado numa máquina real.</span>
+    </span></div>
+    <div class="step"><span class="dot"></span><span>
+      <span class="t">Medição de internet</span>
+      <span class="s">Conferida contra o próprio Windows — o resultado bateu byte a byte.</span>
+    </span></div>
+    <div class="step todo"><span class="dot"></span><span>
+      <span class="t">Interface gráfica</span>
+      <span class="s">Próximo passo. A tela só conversa com o motor, que já está pronto.</span>
+    </span></div>
+    <div class="step todo"><span class="dot"></span><span>
+      <span class="t">Login, assinatura e automação contínua</span>
+      <span class="s">Depois da interface.</span>
+    </span></div>
+  </div>
+</section>
+
+</main>
+
+<footer class="wrap">
+  <p><strong>Optimizer</strong> — app desktop em Go para Windows 10 e 11.</p>
+  <p>Apresentação do projeto. Produto em desenvolvimento.</p>
+</footer>
+
+</body>
+</html>

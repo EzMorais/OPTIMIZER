@@ -70,7 +70,8 @@ O motor completo do produto roda hoje, sem interface gráfica, e é exercitado p
 | Histórico JSONL append-only + desfazer/desfazer tudo | Pronto |
 | Ponto de restauração (`SRSetRestorePointW`) | Implementado; **falta validar em VM** (nunca testado contra o System Restore da máquina de dev, conforme a regra de teste da arquitetura) |
 | Medição de MTU do caminho + ajuste do adaptador | Pronto e validado ao vivo contra o `ping -f -l` do próprio Windows |
-| Detecção de administrador | Pronta |
+| Detecção de administrador e elevação sob demanda | Prontas |
+| **Interface gráfica (Wails v2)** | **Pronta**: três telas (Otimizações com as abas Pessoal/Trabalho, Internet e Histórico), aplicar em lote, simular, desfazer tudo |
 
 Decisões de implementação que nasceram aqui e viraram regra:
 
@@ -81,6 +82,11 @@ Decisões de implementação que nasceram aqui e viraram regra:
 
 ## Próximo passo físico
 
-Rodar `wails init` dentro de `cmd/optimizerui/` para gerar o esqueleto real do frontend (exige instalar a Wails CLI: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`, que por sua vez precisa do Node já instalado nesta máquina). A interface vai apenas chamar `internal/engine` — que já está pronto e testado —, então o trabalho ali é de tela, não de motor.
+A interface gráfica foi feita **sem a Wails CLI**: o Wails v2 entrou como biblioteca Go, o frontend é HTML/CSS/JS puro embutido por `go:embed`, e o build é um `go build -tags "desktop,production"` comum. Isso dispensou Node no build e mantém o .exe em ~11 MB.
 
-Depois disso, em ordem de valor: (1) itens de inicialização e plano de energia, que são os dois maiores ganhos reais do top 15 e ainda não têm implementação; (2) elevação em lote via processo auxiliar, para os itens de máquina; (3) validação do ponto de restauração em VM.
+Em ordem de valor, o que vem agora:
+
+1. **Itens de inicialização e plano de energia** — os dois maiores ganhos reais do top 15, ainda sem implementação.
+2. **Validar o ponto de restauração em VM** — está implementado e exposto na UI, mas nunca foi executado contra o System Restore real.
+3. **Empacotamento**: ícone e metadados de versão (go-winres), instalador Inno Setup e assinatura de código — sem isso o SmartScreen mostra "editor desconhecido".
+4. **Login, assinatura e automação contínua.**

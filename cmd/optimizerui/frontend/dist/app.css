@@ -35,6 +35,9 @@
 }
 
 *{box-sizing:border-box}
+/* Sem isto, o `display` das regras abaixo anula o atributo hidden e elementos
+   escondidos (o modal, a caixa de ponto de restauração) aparecem na tela. */
+[hidden]{display:none !important}
 html,body{height:100%}
 body{
   margin:0;background:var(--bg);color:var(--ink);
@@ -81,7 +84,7 @@ p{margin:0 0 10px}
 
 /* ---------------- conteúdo ---------------- */
 main{flex:1;overflow-y:auto;padding:18px}
-.view{display:none;max-width:940px;margin:0 auto}
+.view{display:none;max-width:1040px;margin:0 auto}
 .view.on{display:block}
 
 .card{background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius);padding:18px}

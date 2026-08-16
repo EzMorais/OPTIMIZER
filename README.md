@@ -4,9 +4,17 @@ SaaS de otimização de performance para Windows — app desktop em Go, com assi
 
 ## Status
 
-Pesquisa técnica e de mercado concluída. **O motor do produto já roda e é testável hoje**, sem interface gráfica: catálogo de otimizações com estado real lido da máquina, aplicar/verificar/desfazer com histórico auditável, ponto de restauração e medição de MTU da conexão. Tudo isso está exposto pela CLI interna `optimizerctl` (ver [Desenvolvimento](#desenvolvimento)).
+Pesquisa técnica e de mercado concluída. **O app desktop já roda**: interface gráfica em Wails v2 sobre o motor completo — catálogo com estado real lido da máquina, aplicar/simular/verificar/desfazer com histórico auditável, ponto de restauração, as abas Pessoal e Trabalho e a medição de MTU da conexão.
 
-O que ainda não existe: a interface gráfica (Wails), login/cobrança e a automação contínua. Próximo passo físico em [`docs/decisoes.md`](./docs/decisoes.md#próximo-passo-físico).
+O que ainda não existe: login/cobrança, automação contínua, corretor de rotas e o instalador assinado. Próximo passo em [`docs/decisoes.md`](./docs/decisoes.md#próximo-passo-físico).
+
+### Instalar nesta máquina para testar
+
+```
+powershell -ExecutionPolicy Bypass -File scripts\instalar.ps1
+```
+
+Compila e instala em `%LOCALAPPDATA%\Programs\Optimizer` (por usuário, sem exigir administrador, sem serviço em segundo plano) e cria os atalhos. Para remover: `scripts\desinstalar.ps1` — que **não** desfaz as otimizações, isso se faz pelo próprio app antes.
 
 ## Por que este produto existe
 
@@ -38,7 +46,7 @@ Ver [`docs/pesquisa-mercado.md`](./docs/pesquisa-mercado.md) para a pesquisa com
 ## Estrutura do repositório
 
 ```
-cmd/optimizerui/         # entrada do app desktop (Wails) — placeholder até `wails init`
+cmd/optimizerui/         # app desktop (Wails v2): bindings Go + frontend embutido no .exe
 cmd/optimizerctl/         # CLI interna de diagnóstico/dev — não distribuída ao usuário
 internal/tweak/            # contrato Tweak, Meta (catálogo como dado) e Registry
 internal/tweaks/            # catálogo embutido; regtweak/ implementa o padrão "tweak de registro"
@@ -47,7 +55,8 @@ internal/engine/              # orquestra diagnosticar → aplicar → verificar
 internal/history/              # histórico JSONL append-only (é o que torna o desfazer possível)
 internal/netdiag/               # medição de rede: MTU real do caminho + ajuste do adaptador
 internal/restore/                # ponto de restauração (SRSetRestorePointW)
-internal/elevate/ console/        # detecção de administrador; UTF-8 no terminal
+internal/elevate/ console/        # administrador e elevação sob demanda; UTF-8 no terminal
+scripts/                           # instalar/desinstalar nesta máquina
 docs/                              # pesquisa e decisões (ver tabela acima)
 ```
 

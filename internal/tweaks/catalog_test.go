@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"optimizer/internal/profiles"
 	"optimizer/internal/tweak"
 	"optimizer/internal/tweaks"
 	"optimizer/internal/tweaks/regtweak"
@@ -145,5 +146,20 @@ func TestManifestoNaoRebaixaExigenciaDeAdministrador(t *testing.T) {
 	}
 	if !m.RequiresAdmin {
 		t.Fatal("um manifesto conseguiu fazer o app achar que um tweak de máquina dispensa administrador")
+	}
+}
+
+// TestPerfisDeRedeReferenciamTweaksExistentes garante que todo ID listado nos
+// perfis de internal/profiles corresponda a um tweak registry-backed real no
+// catálogo — um perfil apontando para um ID inexistente falharia silenciosamente
+// em produção (engine.Apply pula IDs desconhecidos sem erro fatal).
+func TestPerfisDeRedeReferenciamTweaksExistentes(t *testing.T) {
+	reg := tweaks.Build(winreg.NewFake())
+	for _, p := range profiles.List() {
+		for _, id := range p.TweakIDs {
+			if _, ok := reg.Known(id); !ok {
+				t.Errorf("perfil %q referencia tweak %q, que não existe no catálogo registry-backed (pode ser um tweak WMI ainda não registrado — nesse caso, remover do perfil por enquanto)", p.Key, id)
+			}
+		}
 	}
 }

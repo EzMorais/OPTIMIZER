@@ -11,6 +11,7 @@ import (
 	"optimizer/internal/engine"
 	"optimizer/internal/history"
 	"optimizer/internal/netdiag"
+	"optimizer/internal/profiles"
 	"optimizer/internal/restore"
 	"optimizer/internal/tweak"
 	"optimizer/internal/tweaks"
@@ -379,52 +380,63 @@ type PerfilUI struct {
 	NumTweaks   int    `json:"numTweaks"`
 }
 
-// ListarPerfisDere retorna os perfis de rede disponíveis.
+// ListarPerfisRede retorna os perfis de rede disponíveis.
 func (a *App) ListarPerfisRede() []PerfilUI {
-	// TODO: integrar com profiles.List()
-	return []PerfilUI{
-		{
-			Key:       "network-fast",
-			Nome:      "Rede Rápida",
-			Descricao: "Desativa economia de energia, habilita offloads. Foco em throughput.",
-			Ressalvas: "Aumenta consumo de energia do adaptador.",
-			NumTweaks: 2,
-		},
-		{
-			Key:       "network-remote",
-			Nome:      "Trabalho Remoto",
-			Descricao: "Otimiza para RDP, SSH, Zoom. Reduz latência de round-trip.",
-			Ressalvas: "Pode aumentar overhead de ACK em Wi-Fi instável.",
-			NumTweaks: 0,
-		},
-		{
-			Key:       "network-dev",
-			Nome:      "Desenvolvimento",
-			Descricao: "Foco em throughput e latência baixa. Sem interferência de P2P.",
-			Ressalvas: "",
-			NumTweaks: 2,
-		},
-		{
-			Key:       "network-presentation",
-			Nome:      "Apresentação",
-			Descricao: "Minimiza interferências de background. Wi-Fi estável.",
-			Ressalvas: "Exige seleção manual de Wi-Fi 5 GHz.",
-			NumTweaks: 2,
-		},
+	out := make([]PerfilUI, 0, len(profiles.List()))
+	for _, p := range profiles.List() {
+		out = append(out, PerfilUI{
+			Key:       p.Key,
+			Nome:      p.Name,
+			Descricao: p.Description,
+			Ressalvas: p.Caveats,
+			NumTweaks: len(p.TweakIDs),
+		})
 	}
+	return out
 }
 
 // AplicarPerfilRede aplica um perfil inteiro em lote.
-func (a *App) AplicarPerfilRede(ctx context.Context, profileKey string, dryRun bool) []ResultadoUI {
-	// TODO: implementar com a.eng.ApplyProfile()
-	return []ResultadoUI{
-		{
+func (a *App) AplicarPerfilRede(profileKey string, dryRun bool) []ResultadoUI {
+	p, ok := profiles.Get(profileKey)
+	if !ok {
+		return []ResultadoUI{{
 			ID:       profileKey,
-			Nome:     "Perfil " + profileKey,
-			Estado:   "não implementado",
-			Mensagem: "Aplicação de perfil ainda não implementada.",
-		},
+			Estado:   "falhou",
+			Mensagem: fmt.Sprintf("Perfil %q desconhecido.", profileKey),
+		}}
 	}
+
+	if len(p.TweakIDs) == 0 {
+		return []ResultadoUI{{
+			ID:       profileKey,
+			Nome:     p.Name,
+			Estado:   "pulado",
+			Mensagem: "Este perfil ainda não tem tweaks automatizados — apenas recomendações manuais.",
+		}}
+	}
+
+	results := a.eng.Apply(a.ctx, p.TweakIDs, dryRun)
+	out := make([]ResultadoUI, 0, len(results))
+	for _, r := range results {
+		estado := "ok"
+		msg := r.Detail
+		switch {
+		case r.Err != nil:
+			estado = "falhou"
+			msg = r.Err.Error()
+		case r.Skipped:
+			estado = "pulado"
+			msg = r.Reason
+		}
+		out = append(out, ResultadoUI{
+			ID:          r.ID,
+			Nome:        r.Name,
+			Estado:      estado,
+			Mensagem:    msg,
+			PrecisaSair: r.RestartNeeded,
+		})
+	}
+	return out
 }
 
 // ------------------------------------------------------------------ Medição de Rede
@@ -449,52 +461,80 @@ type ComparativoUI struct {
 	Interpretacao   string      `json:"interpretacao"`
 }
 
-// MedirRedeAntes executa um benchmark antes de aplicar um ajuste.
-func (a *App) MedirRedeAntes(ctx context.Context, host string) (BenchmarkUI, error) {
-	// TODO: implementar com netdiag.MeasureLatency()
+// medirRede é a implementação comum de Antes/Depois — só muda o rótulo do momento.
+func (a *App) medirRede(host string) (BenchmarkUI, error) {
 	if host == "" {
 		host = "8.8.8.8"
 	}
+	report, err := netdiag.MeasureLatency(a.ctx, host, 20)
+	if err != nil {
+		return BenchmarkUI{}, err
+	}
+	lossPercent := 0.0
+	if report.PacketsSent > 0 {
+		lossPercent = float64(report.PacketsLost) / float64(report.PacketsSent) * 100
+	}
 	return BenchmarkUI{
-		Timestamp: time.Now().Format(time.RFC3339),
-		Host:      host,
-		AvgRTT:    50,
-		StdDev:    2,
-		MinRTT:    48,
-		MaxRTT:    55,
-		PacketsSent: 20,
-		PacketsLost: 0,
-		LossPercent: 0,
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Host:        report.Host,
+		MinRTT:      report.MinRTT,
+		AvgRTT:      report.AvgRTT,
+		MaxRTT:      report.MaxRTT,
+		StdDev:      report.StdDev,
+		PacketsSent: report.PacketsSent,
+		PacketsLost: report.PacketsLost,
+		LossPercent: lossPercent,
 	}, nil
+}
+
+// MedirRedeAntes executa um benchmark antes de aplicar um ajuste.
+func (a *App) MedirRedeAntes(host string) (BenchmarkUI, error) {
+	return a.medirRede(host)
 }
 
 // MedirRedeDepois executa um benchmark depois de aplicar um ajuste.
-func (a *App) MedirRedeDepois(ctx context.Context, host string) (BenchmarkUI, error) {
-	// TODO: implementar com netdiag.MeasureLatency()
-	if host == "" {
-		host = "8.8.8.8"
-	}
-	return BenchmarkUI{
-		Timestamp: time.Now().Format(time.RFC3339),
-		Host:      host,
-		AvgRTT:    48,
-		StdDev:    2,
-		MinRTT:    46,
-		MaxRTT:    52,
-		PacketsSent: 20,
-		PacketsLost: 0,
-		LossPercent: 0,
-	}, nil
+func (a *App) MedirRedeDepois(host string) (BenchmarkUI, error) {
+	return a.medirRede(host)
 }
 
-// RelatorioComparativo compara dois benchmarks e retorna a interpretação.
+// RelatorioComparativo compara dois benchmarks e retorna a interpretação honesta.
 func (a *App) RelatorioComparativo(antes, depois BenchmarkUI) ComparativoUI {
-	// TODO: implementar com netdiag.Compare()
+	before := netdiag.Benchmark{
+		Host: antes.Host,
+		Latency: netdiag.LatencyReport{
+			Host: antes.Host, MinRTT: antes.MinRTT, AvgRTT: antes.AvgRTT,
+			MaxRTT: antes.MaxRTT, StdDev: antes.StdDev,
+			PacketsSent: antes.PacketsSent, PacketsLost: antes.PacketsLost,
+		},
+		Jitter: antes.StdDev,
+		Loss:   antes.LossPercent,
+	}
+	after := netdiag.Benchmark{
+		Host: depois.Host,
+		Latency: netdiag.LatencyReport{
+			Host: depois.Host, MinRTT: depois.MinRTT, AvgRTT: depois.AvgRTT,
+			MaxRTT: depois.MaxRTT, StdDev: depois.StdDev,
+			PacketsSent: depois.PacketsSent, PacketsLost: depois.PacketsLost,
+		},
+		Jitter: depois.StdDev,
+		Loss:   depois.LossPercent,
+	}
+
+	delta := netdiag.Compare(before, after)
+
+	deltaJitter := "Estável"
+	switch {
+	case delta.JitterDeltaPercent > 10:
+		deltaJitter = fmt.Sprintf("+%.1f%% (piorou)", delta.JitterDeltaPercent)
+	case delta.JitterDeltaPercent < -10:
+		deltaJitter = fmt.Sprintf("%.1f%% (melhorou)", delta.JitterDeltaPercent)
+	}
+
 	return ComparativoUI{
 		Antes:         antes,
 		Depois:        depois,
-		DeltaLatencia: fmt.Sprintf("%d ms", depois.AvgRTT-antes.AvgRTT),
-		DeltaJitter:   "Estável",
-		Interpretacao: "Latência estável. Sem mudança perceptível.",
+		DeltaLatencia: fmt.Sprintf("%+d ms (%.1f%%)", delta.LatencyAbsoluteDelta, delta.LatencyDeltaPercent),
+		DeltaJitter:   deltaJitter,
+		Interpretacao: delta.Interpretation,
 	}
 }

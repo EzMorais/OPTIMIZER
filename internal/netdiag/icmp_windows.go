@@ -149,3 +149,62 @@ func (LiveProber) Ping(ctx context.Context, dst netip.Addr, payload int, timeout
 	r := (*icmpEchoReply)(unsafe.Pointer(&reply[0]))
 	return statusFromIP(r.Status)
 }
+
+// PingRTT envia um único eco ICMP (sem DF, payload pequeno e fixo — o objetivo
+// aqui é medir tempo de ida e volta, não descobrir MTU) e devolve o RTT em ms
+// que o próprio Windows calculou (campo RoundTripTime do IcmpSendEcho).
+// ok=false quando não houve resposta (timeout, inalcançável) — não é erro, é
+// um pacote perdido, que quem chama conta como perda.
+func (LiveProber) PingRTT(ctx context.Context, dst netip.Addr, timeout time.Duration) (rttMs int, ok bool, err error) {
+	if err := ctx.Err(); err != nil {
+		return 0, false, err
+	}
+	if !dst.Is4() {
+		return 0, false, errors.New("medição de latência por enquanto só cobre IPv4")
+	}
+	for _, p := range []*windows.LazyProc{procIcmpCreateFile, procIcmpCloseHandle, procIcmpSendEcho} {
+		if err := p.Find(); err != nil {
+			return 0, false, fmt.Errorf("iphlpapi.dll não expôs %s: %w", p.Name, err)
+		}
+	}
+
+	handle, _, lastErr := syscall.SyscallN(procIcmpCreateFile.Addr())
+	if handle == uintptr(windows.InvalidHandle) || handle == 0 {
+		return 0, false, fmt.Errorf("abrindo canal ICMP: %w", lastErr)
+	}
+	defer syscall.SyscallN(procIcmpCloseHandle.Addr(), handle)
+
+	b4 := dst.As4()
+	dest := binary.LittleEndian.Uint32(b4[:])
+
+	const payload = 32 // tamanho clássico do `ping` do Windows — suficiente para medir RTT
+	data := make([]byte, payload)
+	for i := range data {
+		data[i] = byte('a' + i%26)
+	}
+
+	opts := ipOptionInformation{TTL: 128}
+	replyLen := int(unsafe.Sizeof(icmpEchoReply{})) + payload + 8 + 256
+	reply := make([]byte, replyLen)
+
+	replies, _, lastErr := syscall.SyscallN(procIcmpSendEcho.Addr(),
+		handle,
+		uintptr(dest),
+		uintptr(unsafe.Pointer(&data[0])),
+		uintptr(uint16(payload)),
+		uintptr(unsafe.Pointer(&opts)),
+		uintptr(unsafe.Pointer(&reply[0])),
+		uintptr(uint32(replyLen)),
+		uintptr(uint32(timeout.Milliseconds())),
+	)
+
+	if replies == 0 {
+		return 0, false, nil
+	}
+
+	r := (*icmpEchoReply)(unsafe.Pointer(&reply[0]))
+	if r.Status != ipSuccess {
+		return 0, false, nil
+	}
+	return int(r.RoundTripTime), true, nil
+}

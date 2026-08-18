@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net/netip"
 	"time"
 )
 
@@ -176,9 +177,21 @@ func interpretBenchmarkDelta(delta BenchmarkDelta) string {
 	return "Benchmarks capturados."
 }
 
-// MeasureLatency executa benchmark real de latência contra um host via ICMP ping.
-// Usa o Prober existente (LiveProber) para enviar múltiplos pings.
+// RTTProber envia um único eco ICMP e devolve o RTT em ms. ok=false é pacote
+// perdido (timeout/inalcançável), não erro — quem chama conta como perda.
+type RTTProber interface {
+	PingRTT(ctx context.Context, dst netip.Addr, timeout time.Duration) (rttMs int, ok bool, err error)
+}
+
+// MeasureLatency executa benchmark real de latência contra um host via ICMP ping
+// (IcmpSendEcho, mesma técnica de netdiag/mtu.go — sem exigir administrador).
+// Cada pacote perdido conta para PacketsLost; um erro só é retornado se nem o
+// primeiro pacote saiu (host não resolvido, canal ICMP indisponível).
 func MeasureLatency(ctx context.Context, host string, count int) (LatencyReport, error) {
+	return measureLatency(ctx, LiveProber{}, host, count)
+}
+
+func measureLatency(ctx context.Context, prober RTTProber, host string, count int) (LatencyReport, error) {
 	if host == "" {
 		host = "8.8.8.8"
 	}
@@ -186,16 +199,23 @@ func MeasureLatency(ctx context.Context, host string, count int) (LatencyReport,
 		count = 20
 	}
 
-	// Tentar resolver host
-	// Nota: netip.ParseAddr requer IP direto; para nomes de host usar net.LookupIP (mas adicionaria dependência)
-	// Por enquanto, focar em IPs e deixar nome de host para versão futura.
-	// Fallback: usar o host string como está (netip.ParseAddr pode aceitar nomes numa versão futura)
+	addr, err := Resolve(host)
+	if err != nil {
+		return LatencyReport{}, err
+	}
 
-	// Stub: retornar com dados simulados (TODO: implementar pings reais via Prober)
-	rtts := make([]int, count)
+	var rtts []int
 	for i := 0; i < count; i++ {
-		// Simular: RTT entre 30-60ms com padrão realista
-		rtts[i] = 35 + (i % 30)
+		if err := ctx.Err(); err != nil {
+			return LatencyReport{}, err
+		}
+		rtt, ok, err := prober.PingRTT(ctx, addr, 1200*time.Millisecond)
+		if err != nil {
+			return LatencyReport{}, err
+		}
+		if ok {
+			rtts = append(rtts, rtt)
+		}
 	}
 
 	return MeasureLatencyFromRTTs(host, rtts, count)

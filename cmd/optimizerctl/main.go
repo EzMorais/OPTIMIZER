@@ -22,6 +22,7 @@ import (
 	"optimizer/internal/engine"
 	"optimizer/internal/history"
 	"optimizer/internal/netdiag"
+	"optimizer/internal/profiles"
 	"optimizer/internal/restore"
 	"optimizer/internal/tweak"
 	"optimizer/internal/tweaks"
@@ -637,46 +638,74 @@ Exemplos:
 `)
 		os.Exit(1)
 	}
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-	if err := g.resolve(); err != nil {
+	soltos, err := parseArgs(fs, g, args)
+	if err != nil {
 		return err
 	}
 
-	if fs.NArg() == 0 {
+	if len(soltos) == 0 {
 		fs.Usage()
 		return nil
 	}
 
-	subcmd := fs.Arg(0)
+	subcmd := soltos[0]
 	switch subcmd {
 	case "listar":
 		return cmdPerfilListar()
 	case "aplicar":
-		if fs.NArg() < 2 {
+		if len(soltos) < 2 {
 			return fmt.Errorf("aplicar requer um nome de perfil")
 		}
-		return cmdPerfilAplicar(g, fs.Arg(1))
+		return cmdPerfilAplicar(g, soltos[1])
 	default:
 		return fmt.Errorf("subcomando desconhecido: %s", subcmd)
 	}
 }
 
 func cmdPerfilListar() error {
-	// TODO: implementar quando profiles.List() estiver disponível
-	fmt.Println("Perfis disponíveis:")
-	fmt.Println("  network-fast        — Rede Rápida")
-	fmt.Println("  network-remote      — Trabalho Remoto")
-	fmt.Println("  network-dev         — Desenvolvimento")
-	fmt.Println("  network-presentation — Apresentação")
+	fmt.Println("Perfis de rede disponíveis:")
+	fmt.Println()
+	w := newTab()
+	fmt.Fprintln(w, "CHAVE\tNOME\tTWEAKS\tDESCRIÇÃO")
+	for _, p := range profiles.List() {
+		fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", p.Key, p.Name, len(p.TweakIDs), p.Description)
+	}
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	fmt.Println("\nPara aplicar: optimizerctl perfil aplicar <chave> [--simular]")
 	return nil
 }
 
 func cmdPerfilAplicar(g *globals, profileKey string) error {
-	// TODO: implementar com g.engine.ApplyProfile()
-	fmt.Printf("Aplicar perfil: %s (simulação)\n", profileKey)
-	return fmt.Errorf("não implementado ainda")
+	p, ok := profiles.Get(profileKey)
+	if !ok {
+		return fmt.Errorf("perfil desconhecido: %q — rode `optimizerctl perfil listar`", profileKey)
+	}
+
+	if len(p.TweakIDs) == 0 {
+		fmt.Printf("Perfil %q (%s) não tem tweaks automatizados ainda — apenas recomendações manuais.\n", p.Name, p.Key)
+		if p.Caveats != "" {
+			fmt.Printf("Ressalva: %s\n", p.Caveats)
+		}
+		return nil
+	}
+
+	eng, err := openEngine(g)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := ctxWithSignal()
+	defer cancel()
+
+	fmt.Printf("Aplicando perfil %q (%s) — %d item(ns)%s\n", p.Name, p.Key, len(p.TweakIDs), seSimulacao(g.dryRun))
+	if p.Caveats != "" {
+		fmt.Printf("Ressalva: %s\n", p.Caveats)
+	}
+	fmt.Println()
+
+	return imprimirResultados(eng.Apply(ctx, p.TweakIDs, g.dryRun), g.dryRun)
 }
 
 func cmdRede(args []string) error {
@@ -699,19 +728,17 @@ Exemplos:
 `)
 		os.Exit(1)
 	}
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-	if err := g.resolve(); err != nil {
+	soltos, err := parseArgs(fs, g, args)
+	if err != nil {
 		return err
 	}
 
-	if fs.NArg() == 0 {
+	if len(soltos) == 0 {
 		fs.Usage()
 		return nil
 	}
 
-	subcmd := fs.Arg(0)
+	subcmd := soltos[0]
 	switch subcmd {
 	case "medir":
 		return cmdRedeMedir(*destino)
@@ -723,13 +750,58 @@ Exemplos:
 }
 
 func cmdRedeMedir(destino string) error {
-	// TODO: implementar com netdiag.MeasureLatency()
-	fmt.Printf("Medindo latência até %s...\n", destino)
-	return fmt.Errorf("não implementado ainda")
+	ctx, cancel := ctxWithSignal()
+	defer cancel()
+
+	fmt.Printf("Medindo latência até %s (20 pacotes)...\n\n", destino)
+
+	report, err := netdiag.MeasureLatency(ctx, destino, 20)
+	if err != nil {
+		return fmt.Errorf("erro na medição: %w", err)
+	}
+
+	fmt.Printf("Host:              %s\n", report.Host)
+	fmt.Printf("Latência mínima:   %d ms\n", report.MinRTT)
+	fmt.Printf("Latência média:    %d ms\n", report.AvgRTT)
+	fmt.Printf("Latência máxima:   %d ms\n", report.MaxRTT)
+	fmt.Printf("Jitter (stddev):   %d ms\n", report.StdDev)
+	fmt.Printf("Pacotes enviados:  %d\n", report.PacketsSent)
+	fmt.Printf("Pacotes perdidos:  %d\n", report.PacketsLost)
+	if report.PacketsSent > 0 {
+		lossPercent := float64(report.PacketsLost) / float64(report.PacketsSent) * 100
+		fmt.Printf("Perda:             %.1f%%\n", lossPercent)
+	}
+	fmt.Println("\nNota: esta é uma medição isolada. Para comparar antes/depois de um ajuste, meça duas vezes e use a interpretação honesta (diferenças <5% costumam ser ruído).")
+
+	return nil
 }
 
 func cmdRedeDiag(destino string) error {
-	// TODO: implementar diagnóstico completo
-	fmt.Printf("Diagnóstico completo para %s\n", destino)
-	return fmt.Errorf("não implementado ainda")
+	ctx, cancel := ctxWithSignal()
+	defer cancel()
+
+	fmt.Printf("Diagnóstico completo de rede — %s\n\n", destino)
+
+	report, err := netdiag.MeasureLatency(ctx, destino, 20)
+	if err != nil {
+		return fmt.Errorf("erro na medição de latência: %w", err)
+	}
+
+	fmt.Println("== Latência ==")
+	fmt.Printf("Média: %d ms · Min: %d ms · Max: %d ms · Jitter: %d ms\n\n",
+		report.AvgRTT, report.MinRTT, report.MaxRTT, report.StdDev)
+
+	fmt.Println("== Interpretação ==")
+	switch {
+	case report.PacketsLost > 0:
+		lossPercent := float64(report.PacketsLost) / float64(report.PacketsSent) * 100
+		fmt.Printf("Perda de %.1f%% detectada — pode indicar rede instável, Wi-Fi fraco ou congestionamento.\n", lossPercent)
+	case report.StdDev > report.AvgRTT/2:
+		fmt.Println("Jitter alto em relação à latência média — conexão pode estar instável para chamadas/streaming.")
+	default:
+		fmt.Println("Latência e jitter dentro do esperado para uso comum.")
+	}
+
+	fmt.Println("\nPara aplicar um perfil de otimização: optimizerctl perfil listar")
+	return nil
 }

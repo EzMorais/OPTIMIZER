@@ -84,12 +84,12 @@ func (t NICPowerTweak) Check(ctx context.Context) (tweak.CheckResult, error) {
 		return tweak.CheckResult{}, err
 	}
 
-	// TODO: ler estado real via WMI (MSFT_NetAdapterPowerManagement)
-	// Por enquanto, retornar simulação.
-	snap := tweak.Snapshot{"setting": t.Setting, "value": false}
+	// TODO: implementar leitura via WMI (MSFT_NetAdapterPowerManagement)
+	// Por enquanto, retornar estado desconhecido com aviso
+	snap := tweak.Snapshot{"setting": t.Setting, "adapter": t.AdapterName}
 	return tweak.CheckResult{
-		State:       tweak.StateNotApplied,
-		Detail:      fmt.Sprintf("Configuração %q ainda não verificada via WMI", t.Setting),
+		State:       tweak.StateUnknown,
+		Detail:      fmt.Sprintf("Verificação de %q ainda não implementada via WMI/registry", t.Setting),
 		RawSnapshot: snap,
 	}, nil
 }
@@ -103,14 +103,15 @@ func (t NICPowerTweak) Apply(ctx context.Context, dryRun bool) (tweak.ApplyResul
 	if dryRun {
 		return tweak.ApplyResult{
 			Snapshot: current.RawSnapshot,
-			Detail:   fmt.Sprintf("Simulação: %s seria alterado.", t.Name()),
+			Detail: fmt.Sprintf("Simulação — %s seria %s em %q.",
+				t.Setting, map[bool]string{true: "habilitado", false: "desabilitado"}[t.Enabled], t.AdapterName),
 		}, nil
 	}
 
-	// TODO: implementar escrita via WMI + PowerShell fallback
+	// TODO: implementar escrita via WMI + registry fallback
 	return tweak.ApplyResult{
 		Snapshot: current.RawSnapshot,
-		Detail:   fmt.Sprintf("%s foi alterado (simulado, WMI não implementado).", t.Name()),
+		Detail:   fmt.Sprintf("%s foi %s em %q (simulado, implementação WMI pendente).", t.Setting, map[bool]string{true: "habilitado", false: "desabilitado"}[t.Enabled], t.AdapterName),
 	}, nil
 }
 

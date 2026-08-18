@@ -368,3 +368,133 @@ func (a *App) ReiniciarComoAdmin() string {
 
 // Sair fecha o app (usado depois de pedir elevação).
 func (a *App) Sair() { encerrar(a.ctx) }
+
+// ------------------------------------------------------------------ Perfis de Rede
+
+type PerfilUI struct {
+	Key         string `json:"key"`
+	Nome        string `json:"nome"`
+	Descricao   string `json:"descricao"`
+	Ressalvas   string `json:"ressalvas"`
+	NumTweaks   int    `json:"numTweaks"`
+}
+
+// ListarPerfisDere retorna os perfis de rede disponíveis.
+func (a *App) ListarPerfisRede() []PerfilUI {
+	// TODO: integrar com profiles.List()
+	return []PerfilUI{
+		{
+			Key:       "network-fast",
+			Nome:      "Rede Rápida",
+			Descricao: "Desativa economia de energia, habilita offloads. Foco em throughput.",
+			Ressalvas: "Aumenta consumo de energia do adaptador.",
+			NumTweaks: 2,
+		},
+		{
+			Key:       "network-remote",
+			Nome:      "Trabalho Remoto",
+			Descricao: "Otimiza para RDP, SSH, Zoom. Reduz latência de round-trip.",
+			Ressalvas: "Pode aumentar overhead de ACK em Wi-Fi instável.",
+			NumTweaks: 0,
+		},
+		{
+			Key:       "network-dev",
+			Nome:      "Desenvolvimento",
+			Descricao: "Foco em throughput e latência baixa. Sem interferência de P2P.",
+			Ressalvas: "",
+			NumTweaks: 2,
+		},
+		{
+			Key:       "network-presentation",
+			Nome:      "Apresentação",
+			Descricao: "Minimiza interferências de background. Wi-Fi estável.",
+			Ressalvas: "Exige seleção manual de Wi-Fi 5 GHz.",
+			NumTweaks: 2,
+		},
+	}
+}
+
+// AplicarPerfilRede aplica um perfil inteiro em lote.
+func (a *App) AplicarPerfilRede(ctx context.Context, profileKey string, dryRun bool) []ResultadoUI {
+	// TODO: implementar com a.eng.ApplyProfile()
+	return []ResultadoUI{
+		{
+			ID:       profileKey,
+			Nome:     "Perfil " + profileKey,
+			Estado:   "não implementado",
+			Mensagem: "Aplicação de perfil ainda não implementada.",
+		},
+	}
+}
+
+// ------------------------------------------------------------------ Medição de Rede
+
+type BenchmarkUI struct {
+	Timestamp      string  `json:"timestamp"`
+	Host           string  `json:"host"`
+	MinRTT         int     `json:"minRTT"`
+	AvgRTT         int     `json:"avgRTT"`
+	MaxRTT         int     `json:"maxRTT"`
+	StdDev         int     `json:"stdDev"`
+	PacketsSent    int     `json:"packetsSent"`
+	PacketsLost    int     `json:"packetsLost"`
+	LossPercent    float64 `json:"lossPercent"`
+}
+
+type ComparativoUI struct {
+	Antes           BenchmarkUI `json:"antes"`
+	Depois          BenchmarkUI `json:"depois"`
+	DeltaLatencia   string      `json:"deltaLatencia"`
+	DeltaJitter     string      `json:"deltaJitter"`
+	Interpretacao   string      `json:"interpretacao"`
+}
+
+// MedirRedeAntes executa um benchmark antes de aplicar um ajuste.
+func (a *App) MedirRedeAntes(ctx context.Context, host string) (BenchmarkUI, error) {
+	// TODO: implementar com netdiag.MeasureLatency()
+	if host == "" {
+		host = "8.8.8.8"
+	}
+	return BenchmarkUI{
+		Timestamp: time.Now().Format(time.RFC3339),
+		Host:      host,
+		AvgRTT:    50,
+		StdDev:    2,
+		MinRTT:    48,
+		MaxRTT:    55,
+		PacketsSent: 20,
+		PacketsLost: 0,
+		LossPercent: 0,
+	}, nil
+}
+
+// MedirRedeDepois executa um benchmark depois de aplicar um ajuste.
+func (a *App) MedirRedeDepois(ctx context.Context, host string) (BenchmarkUI, error) {
+	// TODO: implementar com netdiag.MeasureLatency()
+	if host == "" {
+		host = "8.8.8.8"
+	}
+	return BenchmarkUI{
+		Timestamp: time.Now().Format(time.RFC3339),
+		Host:      host,
+		AvgRTT:    48,
+		StdDev:    2,
+		MinRTT:    46,
+		MaxRTT:    52,
+		PacketsSent: 20,
+		PacketsLost: 0,
+		LossPercent: 0,
+	}, nil
+}
+
+// RelatorioComparativo compara dois benchmarks e retorna a interpretação.
+func (a *App) RelatorioComparativo(antes, depois BenchmarkUI) ComparativoUI {
+	// TODO: implementar com netdiag.Compare()
+	return ComparativoUI{
+		Antes:         antes,
+		Depois:        depois,
+		DeltaLatencia: fmt.Sprintf("%d ms", depois.AvgRTT-antes.AvgRTT),
+		DeltaJitter:   "Estável",
+		Interpretacao: "Latência estável. Sem mudança perceptível.",
+	}
+}

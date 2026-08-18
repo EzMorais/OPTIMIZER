@@ -40,6 +40,8 @@ Comandos:
   desfazer       Desfaz o que foi aplicado:  desfazer <id...>  |  desfazer --tudo
   historico      Mostra tudo que o app já alterou nesta máquina
   mtu            Mede o MTU ideal desta conexão e explica o resultado
+  perfil         Gerencia perfis nomeados (Rede Rápida, Trabalho Remoto, etc)
+  rede           Realiza medições e diagnósticos de rede
 
 Opções gerais:
   --perfil pessoal|trabalho   Qual aba usar (padrão: pessoal)
@@ -92,6 +94,10 @@ func run(args []string) error {
 		return cmdHistorico(rest)
 	case "mtu":
 		return cmdMTU(rest)
+	case "perfil":
+		return cmdPerfil(rest)
+	case "rede":
+		return cmdRede(rest)
 	}
 	return fmt.Errorf("comando desconhecido %q — rode `optimizerctl ajuda`", cmd)
 }
@@ -613,4 +619,117 @@ func quebrar(s string, largura int) string {
 		linha += len(p)
 	}
 	return b.String()
+}
+
+func cmdPerfil(args []string) error {
+	fs := flag.NewFlagSet("perfil", flag.ExitOnError)
+	g := addGlobals(fs)
+	fs.Usage = func() {
+		fmt.Fprint(os.Stderr, `Uso: optimizerctl perfil <subcomando>
+
+Subcomandos:
+  listar           Lista os perfis disponíveis (Rede Rápida, Trabalho Remoto, etc)
+  aplicar <perfil> Aplica um perfil inteiro em lote
+
+Exemplos:
+  optimizerctl perfil listar
+  optimizerctl perfil aplicar network-fast --simular
+`)
+		os.Exit(1)
+	}
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := g.resolve(); err != nil {
+		return err
+	}
+
+	if fs.NArg() == 0 {
+		fs.Usage()
+		return nil
+	}
+
+	subcmd := fs.Arg(0)
+	switch subcmd {
+	case "listar":
+		return cmdPerfilListar()
+	case "aplicar":
+		if fs.NArg() < 2 {
+			return fmt.Errorf("aplicar requer um nome de perfil")
+		}
+		return cmdPerfilAplicar(g, fs.Arg(1))
+	default:
+		return fmt.Errorf("subcomando desconhecido: %s", subcmd)
+	}
+}
+
+func cmdPerfilListar() error {
+	// TODO: implementar quando profiles.List() estiver disponível
+	fmt.Println("Perfis disponíveis:")
+	fmt.Println("  network-fast        — Rede Rápida")
+	fmt.Println("  network-remote      — Trabalho Remoto")
+	fmt.Println("  network-dev         — Desenvolvimento")
+	fmt.Println("  network-presentation — Apresentação")
+	return nil
+}
+
+func cmdPerfilAplicar(g *globals, profileKey string) error {
+	// TODO: implementar com g.engine.ApplyProfile()
+	fmt.Printf("Aplicar perfil: %s (simulação)\n", profileKey)
+	return fmt.Errorf("não implementado ainda")
+}
+
+func cmdRede(args []string) error {
+	fs := flag.NewFlagSet("rede", flag.ExitOnError)
+	g := addGlobals(fs)
+	destino := fs.String("destino", "8.8.8.8", "host para medir")
+	fs.Usage = func() {
+		fmt.Fprint(os.Stderr, `Uso: optimizerctl rede <subcomando> [opções]
+
+Subcomandos:
+  medir            Mede latência de ping a um host
+  diag             Diagnóstico completo de rede (ping + performance counters)
+
+Opções:
+  --destino <host> Host para medir (padrão: 8.8.8.8)
+
+Exemplos:
+  optimizerctl rede medir
+  optimizerctl rede medir --destino 1.1.1.1
+`)
+		os.Exit(1)
+	}
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := g.resolve(); err != nil {
+		return err
+	}
+
+	if fs.NArg() == 0 {
+		fs.Usage()
+		return nil
+	}
+
+	subcmd := fs.Arg(0)
+	switch subcmd {
+	case "medir":
+		return cmdRedeMedir(*destino)
+	case "diag":
+		return cmdRedeDiag(*destino)
+	default:
+		return fmt.Errorf("subcomando desconhecido: %s", subcmd)
+	}
+}
+
+func cmdRedeMedir(destino string) error {
+	// TODO: implementar com netdiag.MeasureLatency()
+	fmt.Printf("Medindo latência até %s...\n", destino)
+	return fmt.Errorf("não implementado ainda")
+}
+
+func cmdRedeDiag(destino string) error {
+	// TODO: implementar diagnóstico completo
+	fmt.Printf("Diagnóstico completo para %s\n", destino)
+	return fmt.Errorf("não implementado ainda")
 }

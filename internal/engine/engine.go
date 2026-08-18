@@ -257,3 +257,18 @@ func (e *Engine) PendingIDs() ([]string, error) {
 	}
 	return ids, nil
 }
+
+// ApplyProfile aplica um perfil nomeado (ex: "Rede Rápida"). É um wrapper que
+// resolve os IDs do perfil e chama Apply() em lote.
+func (e *Engine) ApplyProfile(ctx context.Context, profile NetworkProfile, dryRun bool) []Result {
+	return e.Apply(ctx, profile.TweakIDs, dryRun)
+}
+
+// NetworkProfile é uma cópia local de profiles.NetworkProfile para evitar import cíclico.
+// Ver internal/profiles/netprofiles.go.
+type NetworkProfile struct {
+	Key      string
+	Name     string
+	TweakIDs []string
+	Caveats  string
+}

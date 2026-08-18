@@ -59,6 +59,7 @@ const (
 	pathMMCSS         = `SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`
 	pathDeliveryOpt   = `SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization`
 	pathGameDVRPolicy = `SOFTWARE\Policies\Microsoft\Windows\GameDVR`
+	pathTcpip         = `SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`
 )
 
 func entries() []entry {
@@ -272,6 +273,56 @@ func entries() []entry {
 					"Em uso comum, o efeito é nenhum. Este mecanismo saiu da documentação ativa da Microsoft — está documentado só em material arquivado.",
 				Evidence:  "docs/catalogo/registro.md#networkthrottlingindex",
 				SortOrder: 90,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "rede.tcp-timed-wait-delay",
+				DisplayName: "Reduzir o tempo de espera de conexões encerradas (TIME_WAIT)",
+				Explanation: "Quando uma conexão TCP é encerrada, o Windows mantém um registro dela por 4 minutos por padrão. " +
+					"Este ajuste reduz esse tempo para 30 segundos, liberando mais portas para novas conexões.",
+				Cat:            tweak.CategoryNetwork,
+				RiskLevel:      tweak.RiskMedium,
+				NeedsRestart:   true,
+				AppliedText:    "O tempo de TIME_WAIT está reduzido para 30 segundos.",
+				NotAppliedText: "O tempo de TIME_WAIT está no padrão (240 segundos).",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathTcpip, "TcpTimedWaitDelay", 30, 240),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat: "Válido para uso intenso de conexões efêmeras (ex.: muitas requisições HTTP rápidas, teste de carga). " +
+					"Em uso comum, porta alguma diferença. Em rede instável ou com muita perda de pacotes, pode causar ressincronização de conexão — deixar como está nesse caso.",
+				Evidence:  "docs/catalogo/rede.md — notas adicionais",
+				SortOrder: 110,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "rede.max-user-port",
+				DisplayName: "Aumentar o número de portas efêmeras disponíveis",
+				Explanation: "O Windows usa portas efêmeras (temporárias) para conexões de saída. O padrão é 5000 portas (de 49152 a 54151). " +
+					"Este ajuste estende até 65535, disponibilizando mais portas para aplicações com muitas conexões simultâneas.",
+				Cat:            tweak.CategoryNetwork,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "O número máximo de portas efêmeras foi estendido.",
+				NotAppliedText: "O número máximo de portas efêmeras está no padrão.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathTcpip, "MaxUserPort", 65534, 5000),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat: "Só importa se seus aplicativos costumam abrir muitas conexões simultâneas (acima de 5000). " +
+					"Não causa problema em aumentar, mas também não traz ganho se você não estiver chegando no limite.",
+				Evidence:  "docs/catalogo/rede.md — notas adicionais",
+				SortOrder: 120,
 			},
 		},
 		{

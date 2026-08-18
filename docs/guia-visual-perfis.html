@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guia Visual — Perfis de Rede OPTIMIZER</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:400,500,700&family=IBM+Plex+Serif:700&family=IBM+Plex+Mono:400&display=swap">
+    <style>
+        :root {
+            --bg-primary: #FAFAF8;
+            --bg-secondary: #F0F0EA;
+            --text-primary: #1A1A16;
+            --text-secondary: #6B6B62;
+            --text-tertiary: #9C9C94;
+            --accent: #0066CC;
+            --accent-dark: #004BA3;
+            --success: #008000;
+            --caveat: #D97706;
+            --border: #E5E5DC;
+
+            --font-display: 'IBM Plex Serif', serif;
+            --font-body: 'IBM Plex Sans', sans-serif;
+            --font-mono: 'IBM Plex Mono', monospace;
+
+            --fs-sm: 13px;
+            --fs-base: 15px;
+            --fs-md: 18px;
+            --fs-lg: 22px;
+            --fs-xl: 28px;
+            --fs-2xl: 36px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --bg-primary: #0A0A08;
+                --bg-secondary: #1A1A16;
+                --text-primary: #F5F5F0;
+                --text-secondary: #A8A89F;
+                --text-tertiary: #7C7C73;
+                --border: #2A2A22;
+            }
+        }
+
+        :root[data-theme="dark"] {
+            --bg-primary: #0A0A08;
+            --bg-secondary: #1A1A16;
+            --text-primary: #F5F5F0;
+            --text-secondary: #A8A89F;
+            --text-tertiary: #7C7C73;
+            --border: #2A2A22;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: var(--fs-base);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Typography */
+        h1, h2, h3, h4 {
+            font-family: var(--font-display);
+            font-weight: 700;
+            line-height: 1.2;
+            text-wrap: balance;
+            margin-top: 1.5em;
+            margin-bottom: 0.75em;
+        }
+
+        h1 {
+            font-size: var(--fs-2xl);
+            color: var(--text-primary);
+        }
+
+        h2 {
+            font-size: var(--fs-xl);
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.75rem;
+        }
+
+        h3 {
+            font-size: var(--fs-lg);
+            color: var(--text-primary);
+        }
+
+        h4 {
+            font-size: var(--fs-md);
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-family: var(--font-body);
+            font-weight: 500;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        a:hover {
+            color: var(--accent-dark);
+            text-decoration: underline;
+        }
+
+        /* Layout */
+        body {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* Header */
+        .header {
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: var(--fs-2xl);
+        }
+
+        .header-subtitle {
+            font-size: var(--fs-md);
+            color: var(--text-secondary);
+            max-width: 600px;
+        }
+
+        /* Hero Statement */
+        .hero {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--accent);
+            padding: 2rem;
+            margin-bottom: 3rem;
+            border-radius: 4px;
+        }
+
+        .hero p {
+            font-size: var(--fs-lg);
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        /* Decision Tree */
+        .decision-tree {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 2rem;
+            margin-bottom: 3rem;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: var(--fs-sm);
+            line-height: 1.8;
+            overflow-x: auto;
+        }
+
+        .decision-tree code {
+            color: var(--text-primary);
+        }
+
+        /* Profile Grid */
+        .profiles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .profile-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 2rem;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+
+        .profile-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .profile-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .profile-name {
+            font-size: var(--fs-lg);
+            font-family: var(--font-display);
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .profile-when {
+            font-size: var(--fs-sm);
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            font-style: italic;
+        }
+
+        .profile-tweaks {
+            margin-bottom: 1.5rem;
+        }
+
+        .profile-tweaks h4 {
+            margin-bottom: 0.75rem;
+            color: var(--success);
+        }
+
+        .tweaks-list {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .tweaks-list li {
+            padding: 0.4rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+            font-size: var(--fs-sm);
+            color: var(--text-secondary);
+        }
+
+        .tweaks-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: 700;
+        }
+
+        .profile-caveats {
+            background: rgba(217, 119, 6, 0.05);
+            border-left: 3px solid var(--caveat);
+            padding: 0.75rem 1rem;
+            margin-top: 1.5rem;
+            border-radius: 2px;
+        }
+
+        .profile-caveats h4 {
+            color: var(--caveat);
+            margin-bottom: 0.5rem;
+        }
+
+        .profile-caveats p {
+            margin: 0;
+            font-size: var(--fs-sm);
+            color: var(--text-secondary);
+        }
+
+        /* Expected Gains */
+        .gains {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+            font-size: var(--fs-sm);
+        }
+
+        .gain-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .gain-row:last-child {
+            border-bottom: none;
+        }
+
+        .gain-label {
+            color: var(--text-secondary);
+        }
+
+        .gain-value {
+            color: var(--success);
+            font-family: var(--font-mono);
+            font-weight: 500;
+        }
+
+        /* Code Blocks */
+        .code-section {
+            margin-bottom: 3rem;
+        }
+
+        .code-example {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            overflow-x: auto;
+        }
+
+        .code-example pre {
+            margin: 0;
+            font-family: var(--font-mono);
+            font-size: var(--fs-sm);
+            line-height: 1.6;
+            color: var(--text-primary);
+        }
+
+        .code-label {
+            font-size: var(--fs-sm);
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 500;
+        }
+
+        .code-comment {
+            color: var(--text-tertiary);
+            font-style: italic;
+        }
+
+        /* Checklist */
+        .checklist {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .checklist ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .checklist li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .checklist li:before {
+            content: "□";
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+        }
+
+        /* Timing Table */
+        .timing-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2rem;
+            font-size: var(--fs-sm);
+        }
+
+        .timing-table th {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .timing-table td {
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .timing-table tr:nth-child(even) {
+            background: var(--bg-secondary);
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 2px solid var(--border);
+            font-size: var(--fs-sm);
+            color: var(--text-tertiary);
+        }
+
+        .footer p {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 1.5rem 1rem;
+            }
+
+            .profiles-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: var(--fs-xl);
+            }
+
+            h2 {
+                font-size: var(--fs-lg);
+            }
+        }
+
+        /* Focus states */
+        a:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        button:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* Accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Guia Visual — Perfis de Rede OPTIMIZER</h1>
+        <p class="header-subtitle">Escolha o perfil certo para seu cenário e entenda quando aplicá-lo. Medição honesta, trade-offs claros, reversibilidade garantida.</p>
+    </div>
+
+    <div class="hero">
+        <p>📊 <strong>Ganhos reais são 5–20%, não magia.</strong> Cada perfil troca uma coisa por outra (latência ↔ throughput, energia ↔ CPU). Medidas honestas antes/depois mostram de verdade.</p>
+    </div>
+
+    <!-- Decision Tree -->
+    <h2>⚡ Qual Perfil Escolher?</h2>
+    <div class="decision-tree">
+<pre>Qual é seu cenário AGORA?
+│
+├─ Trabalho Remoto (RDP, SSH, Zoom, Teams)
+│  └─ APLICAR: "Trabalho Remoto"
+│     ✓ Latência: -10% a -30% (round-trip de ACK)
+│     ✓ Jitter: Mais estável
+│     ⚠️  Aumenta ACKs em rede de alta latência
+│
+├─ Download/Upload Grande (transfer, torrent, backup)
+│  └─ APLICAR: "Rede Rápida"
+│     ✓ Throughput: +5% a +20%
+│     ✓ RSS/RSC ativo (mais cores)
+│     ⚠️  Aumenta consumo de energia do adaptador
+│
+├─ Desenvolvimento (Git, Docker, APIs, compilação remota)
+│  └─ APLICAR: "Desenvolvimento"
+│     ✓ Sem P2P em background
+│     ✓ Builds remotos mais estáveis
+│     ⚠️  Pode reduzir autonomia em bateria
+│
+├─ Apresentação/Reunião (Zoom, streaming, crítico)
+│  └─ APLICAR: "Apresentação"
+│     ✓ Sem interferência de background
+│     ✓ Estabilidade > throughput
+│     ⚠️  Manual: Selecione Wi-Fi 5 GHz
+│
+└─ Nenhum / Deixar Padrão
+   └─ Não aplique (Windows padrão é estável)</pre>
+    </div>
+
+    <!-- Profile Cards -->
+    <h2>📋 Os 4 Perfis</h2>
+    <div class="profiles-grid">
+        <!-- Rede Rápida -->
+        <div class="profile-card">
+            <span class="profile-icon">⚡</span>
+            <div class="profile-name">Rede Rápida</div>
+            <p class="profile-when">Para: Throughput máximo, transferências grandes</p>
+
+            <div class="profile-tweaks">
+                <h4>Alterações Aplicadas</h4>
+                <ul class="tweaks-list">
+                    <li>Desativa economia de energia do NIC</li>
+                    <li>Habilita RSS (distribuir RX entre cores)</li>
+                    <li>Habilita RSC (agrupar pacotes)</li>
+                    <li>TIME_WAIT: 240s → 30s</li>
+                    <li>MaxUserPort: 5000 → 65534</li>
+                </ul>
+            </div>
+
+            <div class="gains">
+                <div class="gain-row">
+                    <span class="gain-label">Throughput:</span>
+                    <span class="gain-value">+5% a +20%</span>
+                </div>
+                <div class="gain-row">
+                    <span class="gain-label">Latência:</span>
+                    <span class="gain-value">-2% a -5%</span>
+                </div>
+                <div class="gain-row">
+                    <span class="gain-label">CPU usage:</span>
+                    <span class="gain-value">+2% a +5%</span>
+                </div>
+            </div>
+
+            <div class="profile-caveats">
+                <h4>⚠️ Trade-off</h4>
+                <p>Aumenta consumo de energia do adaptador. Recomendado em notebooks só se plugado.</p>
+            </div>
+        </div>
+
+        <!-- Trabalho Remoto -->
+        <div class="profile-card">
+            <span class="profile-icon">💼</span>
+            <div class="profile-name">Trabalho Remoto</div>
+            <p class="profile-when">Para: RDP, SSH, Zoom, Teams — latência baixa</p>
+
+            <div class="profile-tweaks">
+                <h4>Alterações Aplicadas</h4>
+                <ul class="tweaks-list">
+                    <li>Desabilita Nagle's Algorithm</li>
+                    <li>Agresivo ACK frequency</li>
+                    <li>Não toca em economia de energia</li>
+                    <li>Não modifica adaptador (deixa bateria)</li>
+                </ul>
+            </div>
+
+            <div class="gains">
+                <div class="gain-row">
+                    <span class="gain-label">Latência (RDP/SSH):</span>
+                    <span class="gain-value">-10% a -30%</span>
+                </div>
+                <div class="gain-row">
+                    <span class="gain-label">Jitter:</span>
+                    <span class="gain-value">Estável</span>
+                </div>
+                <div class="gain-row">
+                    <span class="gain-label">Throughput:</span>
+                    <span class="gain-value">—</span>
+                </div>
+            </div>
+
+            <div class="profile-caveats">
+                <h4>⚠️ Trade-off</h4>
+                <p>Aumenta ACKs em rede de alta latência/perda. Efeito real em RDP/SSH; jogos modernos usam UDP (não aplica).</p>
+            </div>
+        </div>
+
+        <!-- Desenvolvimento -->
+        <div class="profile-card">
+            <span class="profile-icon">💻</span>
+            <div class="profile-name">Desenvolvimento</div>
+            <p class="profile-when">Para: Git, Docker, APIs, compilação remota</p>
+
+            <div class="profile-tweaks">
+                <h4>Alterações Aplicadas</h4>
+                <ul class="tweaks-list">
+                    <li>Desativa Delivery Optimization</li>
+                    <li>Desativa economia de NIC (se importante)</li>
+                    <li>RSS/RSC habilitado (muitas conexões)</li>
+                </ul>
+            </div>
+
+            <div class="gains">
+                <div class="gain-row">
+                    <span class="gain-label">Git/Docker throughput:</span>
+                    <span class="gain-value">+5%</span>
+                </div>
+                <div class="gain-row">
+                    <span class="gain-label">Latência:</span>
+                    <span class="gain-value">-2% a -5%</span>
+                </div>
+                <div class="gain-row">
+                    <span class="gain-label">Estabilidade:</span>
+                    <span class="gain-value">Melhor</span>
+                </div>
+            </div>
+
+            <div class="profile-caveats">
+                <h4>⚠️ Trade-off</h4>
+                <p>Pode reduzir autonomia em notebook (desativa power-saving). Ideal apenas durante jornada de trabalho.</p>
+            </div>
+        </div>
+
+        <!-- Apresentação -->
+        <div class="profile-card">
+            <span class="profile-icon">🎤</span>
+            <div class="profile-name">Apresentação</div>
+            <p class="profile-when">Para: Zoom, Teams, streaming — estabilidade crítica</p>
+
+            <div class="profile-tweaks">
+                <h4>Alterações Aplicadas</h4>
+                <ul class="tweaks-list">
+                    <li>Desativa Delivery Optimization</li>
+                    <li>Remove limite de pacotes em multimídia</li>
+                    <li>Deixa adaptador em defaults (estável)</li>
+                </ul>
+            </div>
+
+            <div class="gains">
+                <div class="gain-row">
+                    <span class="gain-label">Jitter:</span>
+                    <span class="gain-value">Reduzido</span>
+                </div>
+                <div class="gain-row">
+                    <span class="gain-label">Perda de pacotes:</span>
+                    <span class="gain-value">0% em LAN</span>
+                </div>
+                <div class="gain-row">
+                    <span class="gain-label">Latência:</span>
+                    <span class="gain-value">—</span>
+                </div>
+            </div>
+
+            <div class="profile-caveats">
+                <h4>⚠️ Manual necessário</h4>
+                <p>Selecione Wi-Fi 5 GHz manualmente (menos congestionado). Feche downloads em background antes.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLI Shortcuts -->
+    <h2>⌨️ Atalhos & Comandos</h2>
+
+    <div class="code-section">
+        <h3>CLI (Desenvolvimento/Teste)</h3>
+
+        <div class="code-label">Listar perfis disponíveis</div>
+        <div class="code-example">
+            <pre>optimizerctl perfil listar</pre>
+        </div>
+
+        <div class="code-label">Simular aplicação (sem gravar nada)</div>
+        <div class="code-example">
+            <pre>optimizerctl perfil aplicar network-fast --simular</pre>
+        </div>
+
+        <div class="code-label">Aplicar um perfil de verdade (requer admin)</div>
+        <div class="code-example">
+            <pre>optimizerctl perfil aplicar network-remote</pre>
+        </div>
+
+        <div class="code-label">Medir latência antes de um ajuste</div>
+        <div class="code-example">
+            <pre>optimizerctl rede medir --destino 8.8.8.8</pre>
+        </div>
+
+        <div class="code-label">Diagnóstico completo de rede</div>
+        <div class="code-example">
+            <pre>optimizerctl rede diag --destino 1.1.1.1</pre>
+        </div>
+
+        <div class="code-label">Desfazer tudo</div>
+        <div class="code-example">
+            <pre>optimizerctl desfazer --tudo</pre>
+        </div>
+    </div>
+
+    <!-- Desktop GUI -->
+    <div class="code-section">
+        <h3>GUI Desktop (Quando Pronto)</h3>
+        <div class="code-example">
+            <pre>1. Abrir OPTIMIZER → aba "Internet e Rede"
+2. Clicar "Medir Antes" (⏱️ 15 segundos)
+3. Escolher perfil (ex: "Rede Rápida")
+4. Revisar Caveats → "Aplicar Perfil"
+5. Clicar "Medir Depois" (⏱️ 15 segundos)
+6. Ver delta (antes: 50ms → depois: 47ms = <span class="code-comment">-6%</span>)
+7. Se não gostar: "Desfazer"</pre>
+        </div>
+    </div>
+
+    <!-- Checklist -->
+    <h2>✓ Checklist Antes & Depois</h2>
+
+    <h3>Antes de Aplicar um Perfil</h3>
+    <div class="checklist">
+        <ul>
+            <li>Internet estável (speedtest.net)</li>
+            <li>Nenhum download grande em background</li>
+            <li>Reinício de roteador/modem (opcional mas recomendado)</li>
+            <li>Medição de latência baseline (20 pacotes com <code>ping -n 20 &lt;host&gt;</code>)</li>
+        </ul>
+    </div>
+
+    <h3>Depois de Aplicar Perfil</h3>
+    <div class="checklist">
+        <ul>
+            <li>Esperar 2–5 minutos (sistema estabiliza)</li>
+            <li>Medir latência novamente (mesmo host, 20 pacotes)</li>
+            <li>Verificar se jitter diminuiu (stddev menor)</li>
+            <li>Testar aplicação real (RDP/Zoom/Git)</li>
+            <li>Se ruim: <code>optimizerctl desfazer --tudo</code></li>
+        </ul>
+    </div>
+
+    <!-- Timing -->
+    <h2>⏰ Timing & Duração Recomendada</h2>
+    <table class="timing-table">
+        <thead>
+            <tr>
+                <th>Cenário</th>
+                <th>Perfil</th>
+                <th>Quando Ativar</th>
+                <th>Duração</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Desenvolvedor</td>
+                <td>Desenvolvimento</td>
+                <td>9h–18h</td>
+                <td>Sempre ativo</td>
+            </tr>
+            <tr>
+                <td>Usuário doméstico</td>
+                <td>Rede Rápida</td>
+                <td>Sob demanda</td>
+                <td>Durante downloads</td>
+            </tr>
+            <tr>
+                <td>Executivo remoto</td>
+                <td>Trabalho Remoto</td>
+                <td>8h–17h</td>
+                <td>Sempre ativo</td>
+            </tr>
+            <tr>
+                <td>Apresentador</td>
+                <td>Apresentação</td>
+                <td>30 min antes</td>
+                <td>Temporário</td>
+            </tr>
+            <tr>
+                <td>Jogador online</td>
+                <td>Nenhum</td>
+                <td>—</td>
+                <td>UDP não é afetado</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Footer -->
+    <div class="footer">
+        <h2>📌 Notas Importantes</h2>
+        <p><strong>Não é magia:</strong> Ganhos são 5–20%, não 2x. Internet real é limitada por provedor/roteador, não por Windows.</p>
+        <p><strong>Reversibilidade:</strong> Cada perfil salva estado anterior. <code>desfazer --tudo</code> = volta ao original.</p>
+        <p><strong>Honestidade:</strong> Cada tweak inclui caveat (aviso) sobre trade-offs. Ler sempre antes de aplicar.</p>
+        <p><strong>Medição real:</strong> Sempre medir com ping real (20+ pacotes) antes/depois. Amostra única = ruído.</p>
+        <p><strong>Context matters:</strong> Ganho em Git clone ≠ ganho em gameplay (maioria joga UDP). Aplicar perfil certo para o cenário.</p>
+    </div>
+
+</body>
+</html>

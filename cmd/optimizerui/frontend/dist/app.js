@@ -298,18 +298,23 @@ function ligarEventos() {
       fecharModalBenchmark();
     }
 
-    // Interrompe o polling de CPU se o usuário sair da aba Diagnóstico
-    if (viewId !== "diag" && cpuTimer) {
-      clearInterval(cpuTimer);
-      cpuTimer = null;
+    // Interrompe o polling de telemetria se o usuário sair da aba Telemetria
+    if (viewId !== "telemetria" && telemetriaTimer) {
+      clearInterval(telemetriaTimer);
+      telemetriaTimer = null;
     }
 
-    if (viewId === "perfis") carregarEstadoPerfis();
+    if (viewId === "perfis") {
+      carregarEstadoPerfis();
+      carregarVisaoGeral();
+    }
+    if (viewId === "telemetria") {
+      atualizarTelemetriaAoVivo();
+      if (!telemetriaTimer) telemetriaTimer = setInterval(atualizarTelemetriaAoVivo, 1000);
+    }
     if (viewId === "diag") {
       carregarStartup();
       carregarDiscos();
-      atualizarMetricasCPU();
-      if (!cpuTimer) cpuTimer = setInterval(atualizarMetricasCPU, 1500);
     }
     if (viewId === "otim" && deveDiagnosticarAoAbrirAjustes(ultimoDiagnostico)) {
       diagnosticar();
@@ -318,6 +323,7 @@ function ligarEventos() {
     if (viewId === "rede") {
       carregarPerfis();
       carregarDNSAtual();
+      atualizarGraficoPingAoVivo();
     }
   }));
 
@@ -1833,36 +1839,185 @@ async function restaurarPerfilUso(key) {
 }
 
 /* ==========================================================================
-   Métricas de CPU em Tempo Real (Aba Diagnóstico)
+   Motor de Gráficos e Telemetria em Tempo Real (Micro-Canvas 60 FPS)
    ========================================================================== */
 
-async function atualizarMetricasCPU() {
+const MAX_CHART_SAMPLES = 60;
+const historyCPU = new Array(MAX_CHART_SAMPLES).fill(0);
+const historyGPU = new Array(MAX_CHART_SAMPLES).fill(0);
+const historyRAM = new Array(MAX_CHART_SAMPLES).fill(0);
+const historyPing = new Array(MAX_CHART_SAMPLES).fill(0);
+
+let telemetriaTimer = null;
+
+function renderMicroChart(canvasId, dataArray, strokeColor, fillColor, maxScale = 100) {
+  const canvas = typeof canvasId === "string" ? document.getElementById(canvasId) : canvasId;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = (canvas.width = (rect.width || 480) * dpr);
+  const h = (canvas.height = (rect.height || 140) * dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  if (!dataArray || dataArray.length < 2) return;
+
+  // Linhas sutis de grade
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i <= 3; i++) {
+    const y = (h / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+
+  // Mapear pontos
+  const step = w / (dataArray.length - 1);
+  const points = dataArray.map((val, idx) => {
+    const clamped = Math.max(0, Math.min(maxScale, val));
+    const y = h - (clamped / maxScale) * (h * 0.85) - h * 0.05;
+    return { x: idx * step, y: y };
+  });
+
+  // Área preenchida com gradiente
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const cpX = (prev.x + curr.x) / 2;
+    ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
+  }
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, fillColor || "rgba(0, 240, 255, 0.3)");
+  grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Linha do traço com glow
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const cpX = (prev.x + curr.x) / 2;
+    ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
+  }
+  ctx.strokeStyle = strokeColor || "#00f0ff";
+  ctx.lineWidth = 2 * dpr;
+  ctx.shadowColor = strokeColor || "#00f0ff";
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Ponto na última amostra
+  const last = points[points.length - 1];
+  ctx.beginPath();
+  ctx.arc(last.x, last.y, 4 * dpr, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = strokeColor || "#00f0ff";
+  ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+async function atualizarTelemetriaAoVivo() {
   try {
-    const info = await App.ObterMetricasCPU();
-    if (!info) return;
+    const data = await App.ObterTelemetriaAoVivo();
+    if (!data) return;
 
-    const totalValEl = $("#cpu-total-val");
-    const barFillEl = $("#cpu-bar-fill");
-    const coresValEl = $("#cpu-cores-val");
-    const procsEl = $("#cpu-top-processes");
+    // Atualiza buffers de histórico
+    historyCPU.shift();
+    historyCPU.push(data.cpuUsagePercent || 0);
 
-    if (totalValEl) totalValEl.textContent = `${info.totalUsagePercent.toFixed(1)}%`;
-    if (barFillEl) {
-      barFillEl.style.width = `${Math.min(100, Math.max(0, info.totalUsagePercent))}%`;
-      barFillEl.style.background = info.totalUsagePercent > 80 ? 'var(--danger)' : (info.totalUsagePercent > 50 ? 'var(--warn)' : 'var(--accent)');
+    historyGPU.shift();
+    historyGPU.push(data.gpuUsagePercent || 0);
+
+    historyRAM.shift();
+    historyRAM.push(data.ramUsedPercent || 0);
+
+    // Renderiza gráficos de Micro-Canvas
+    renderMicroChart("canvas-cpu", historyCPU, "#00f0ff", "rgba(0, 240, 255, 0.25)", 100);
+    renderMicroChart("canvas-gpu", historyGPU, "#76b900", "rgba(118, 185, 0, 0.25)", 100);
+    renderMicroChart("canvas-ram", historyRAM, "#a855f7", "rgba(168, 85, 247, 0.25)", 100);
+
+    // Atualiza valores de CPU
+    const elCpuVal = $("#telem-cpu-val");
+    if (elCpuVal) elCpuVal.textContent = `${(data.cpuUsagePercent || 0).toFixed(1)}%`;
+    const elCpuExtra = $("#telem-cpu-extra");
+    if (elCpuExtra) {
+      const tempStr = data.cpuTempCelsius !== undefined && data.cpuTempCelsius !== null ? `${data.cpuTempCelsius.toFixed(1)}°C` : "Sensor N/D";
+      elCpuExtra.textContent = `${(data.cpuFrequencyMhz || 0).toFixed(0)} MHz · ${tempStr}`;
     }
-    if (coresValEl) coresValEl.textContent = `${info.physicalCores} Físicos / ${info.logicalProcessors} Lógicos`;
+    const elCpuCores = $("#telem-cpu-cores");
+    if (elCpuCores) elCpuCores.textContent = `${data.physicalCores || '--'} Núcleos Físicos / ${data.logicalProcessors || '--'} Lógicos`;
 
-    if (procsEl && info.topProcesses && info.topProcesses.length) {
-      procsEl.innerHTML = info.topProcesses.map((p) => `
-        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12px;">
-          <span>• <b>${esc(p.name)}</b> (PID: ${p.pid})</span>
-          <span class="mono"><b>${p.cpuPercent.toFixed(1)}s</b> CPU acumulada</span>
+    // Atualiza valores de GPU
+    const elGpuVal = $("#telem-gpu-val");
+    if (elGpuVal) elGpuVal.textContent = `${(data.gpuUsagePercent || 0).toFixed(1)}%`;
+    const elGpuExtra = $("#telem-gpu-extra");
+    if (elGpuExtra) {
+      const gTempStr = data.gpuTempCelsius !== undefined && data.gpuTempCelsius !== null ? `${data.gpuTempCelsius.toFixed(1)}°C` : "Sensor N/D";
+      elGpuExtra.textContent = `VRAM: ${(data.gpuMemoryUsedMb || 0).toFixed(0)} MB · ${gTempStr}`;
+    }
+    const elGpuVramTotal = $("#telem-gpu-vram-total");
+    if (elGpuVramTotal) elGpuVramTotal.textContent = `Memória Dedicada: ${(data.gpuMemoryTotalMb || 0).toFixed(0)} MB`;
+
+    // Atualiza valores de RAM
+    const elRamVal = $("#telem-ram-val");
+    if (elRamVal) elRamVal.textContent = `${(data.ramUsedPercent || 0).toFixed(1)}%`;
+    const elRamExtra = $("#telem-ram-extra");
+    if (elRamExtra) elRamExtra.textContent = `${(data.ramUsedMb || 0).toFixed(0)} / ${(data.ramTotalMb || 0).toFixed(0)} MB`;
+    const elRamAvail = $("#telem-ram-avail");
+    if (elRamAvail) elRamAvail.textContent = `Livre: ${Math.max(0, (data.ramTotalMb || 0) - (data.ramUsedMb || 0)).toFixed(0)} MB`;
+
+    // Throttling
+    const elThrottling = $("#telem-throttling-badge");
+    if (elThrottling) {
+      elThrottling.textContent = data.thermalThrottled ? "Throttling Térmico Ativo!" : "Throttling: Normal";
+      elThrottling.style.color = data.thermalThrottled ? "var(--danger)" : "var(--accent)";
+    }
+
+    // Top Processos
+    const procsEl = $("#telem-top-processes");
+    if (procsEl && data.topProcesses && data.topProcesses.length) {
+      procsEl.innerHTML = data.topProcesses.map((p) => `
+        <div class="process-row-item">
+          <div>
+            <b>${esc(p.name)}</b> <span class="muted">(PID: ${p.pid})</span>
+          </div>
+          <div class="mono bold" style="color:var(--accent);">
+            ${p.percent.toFixed(1)}% CPU
+          </div>
         </div>
       `).join("");
     }
   } catch (e) {
     // Polling silencioso
+  }
+}
+
+async function atualizarGraficoPingAoVivo() {
+  try {
+    const host = ($("#destino") && $("#destino").value.trim()) || "8.8.8.8";
+    const res = await App.MedirRedeAntes(host);
+    if (res && res.avgRTT) {
+      historyPing.shift();
+      historyPing.push(res.avgRTT);
+      renderMicroChart("canvas-ping", historyPing, "#3b82f6", "rgba(59, 130, 246, 0.25)", 150);
+      const elPingVal = $("#telem-ping-val");
+      if (elPingVal) elPingVal.textContent = `${res.avgRTT} ms`;
+    }
+  } catch (e) {
+    // Silencioso
   }
 }
 

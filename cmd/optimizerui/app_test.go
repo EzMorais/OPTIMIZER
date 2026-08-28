@@ -294,3 +294,41 @@ func TestAppMostraEAplicaDNSDaInterfaceAtiva(t *testing.T) {
 		t.Fatalf("configuração de DNS não foi executada: %+v", runner.scripts)
 	}
 }
+
+func TestAppTelemetriaAoVivo(t *testing.T) {
+	app := novoAppTeste(t)
+	mock := &telemetry.MockProvider{
+		Samples: []telemetry.MetricSample{
+			{
+				CPUUsagePercent:   25.5,
+				CPUFrequencyMHz:   3600,
+				GPUUsagePercent:   42.0,
+				GPUMemoryUsedMB:   2048,
+				RAMUsedMB:         8192,
+				RAMTotalMB:        32768,
+				ThermalThrottling: false,
+			},
+		},
+		HardwareInfo: telemetry.HardwareStaticInfo{
+			PhysicalCores: 8,
+			LogicalCores:  16,
+			TotalRAMMB:    32768,
+			TotalGPUMemMB: 8192,
+		},
+	}
+	app.benchCollector = telemetry.NewCollector(mock)
+
+	telem := app.ObterTelemetriaAoVivo()
+	if telem.CPUUsagePercent != 25.5 {
+		t.Errorf("CPUUsagePercent = %f, esperado 25.5", telem.CPUUsagePercent)
+	}
+	if telem.GPUUsagePercent != 42.0 {
+		t.Errorf("GPUUsagePercent = %f, esperado 42.0", telem.GPUUsagePercent)
+	}
+	if telem.RAMUsedMB != 8192 {
+		t.Errorf("RAMUsedMB = %f, esperado 8192", telem.RAMUsedMB)
+	}
+	if telem.PhysicalCores != 8 || telem.LogicalProcessors != 16 {
+		t.Errorf("Cores = %d/%d, esperado 8/16", telem.PhysicalCores, telem.LogicalProcessors)
+	}
+}

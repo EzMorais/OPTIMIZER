@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Optimizer</title>
+<title>Optimizer 2.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -46,16 +46,16 @@
   </div>
 </header>
 
-<!-- Navegação em Abas -->
+<!-- Navegação em Abas Modulares -->
 <nav class="main-nav">
   <div class="nav-tabs">
     <button class="nav-tab on" data-view="perfis" id="tab-perfis">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       <span>Perfis de Uso</span>
     </button>
-    <button class="nav-tab" data-view="diag" id="tab-diag">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-      <span>Diagnóstico</span>
+    <button class="nav-tab" data-view="telemetria" id="tab-telemetria">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      <span>Telemetria & Gráficos</span>
     </button>
     <button class="nav-tab" data-view="otim" id="tab-otim">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
@@ -65,6 +65,10 @@
     <button class="nav-tab" data-view="rede" id="tab-rede">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
       <span>Internet & Rede</span>
+    </button>
+    <button class="nav-tab" data-view="diag" id="tab-diag">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+      <span>Diagnóstico</span>
     </button>
     <button class="nav-tab" data-view="hist" id="tab-hist">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -76,13 +80,14 @@
 <!-- Conteúdo Principal -->
 <main class="content-viewport">
 
-  <!-- ==================== ABA 1: PERFIS DE USO (HOME) ==================== -->
+  <!-- ==================== FEATURE 1: PERFIS DE USO (HOME) ==================== -->
   <section id="view-perfis" class="view-panel on">
     <div class="profiles-hero">
       <h1 class="hero-title">Perfis Diretos de Otimização</h1>
       <p class="hero-subtitle">Aplicação transacional e segura com rollback atômico. Ajustes manuais individuais nunca são afetados pela troca de perfil.</p>
     </div>
 
+    <!-- Visão Geral Consolidada -->
     <section class="overview-card" id="visao-geral" aria-live="polite">
       <div class="overview-loading">
         <span class="pulse-spinner"></span>
@@ -90,6 +95,7 @@
       </div>
     </section>
 
+    <!-- Grid de Perfis -->
     <div class="use-profiles-grid">
       
       <!-- Card JOGO -->
@@ -102,7 +108,7 @@
         </div>
         <h2 class="profile-title">JOGO</h2>
         <p class="profile-tagline">FPS Máximo, Responsividade & Baixa Latência</p>
-        <p class="profile-objective">Ativa o plano de Alto Desempenho, suspensão na tomada desativada, prioridade de primeiro plano, MMCSS Games, otimizações de jogos em janela do Win11, HAGS e TCP NoDelay na rota padrão.</p>
+        <p class="profile-objective">Ativa o plano de Alto Desempenho, suspensão desativada, prioridade de GPU em primeiro plano, MMCSS Games, otimizações Win11, HAGS e TCP NoDelay.</p>
         
         <div class="profile-meta-tags">
           <span class="badge-tag rec">Energia</span>
@@ -164,7 +170,7 @@
         </div>
         <h2 class="profile-title">CODING</h2>
         <p class="profile-tagline">Compilação, IDEs, Docker/WSL & Sessões Longas</p>
-        <p class="profile-objective">Mantém suspensão na tomada desligada, suporte a caminhos longos (Long Paths 260+), carimbo de último acesso NTFS desativado e garante todos os serviços essenciais ativos.</p>
+        <p class="profile-objective">Mantém suspensão na tomada desligada, suporte a caminhos longos (Long Paths 260+), carimbo NTFS desativado e garante todos os serviços ativos.</p>
         
         <div class="profile-meta-tags">
           <span class="badge-tag rec">Sistema</span>
@@ -188,147 +194,129 @@
     </div>
   </section>
 
-  <!-- ==================== ABA 2: DIAGNÓSTICO & HARDWARE ==================== -->
-  <section id="view-diag" class="view-panel">
-    
-    <!-- Painel de CPU em Tempo Real -->
-    <div class="glass-card">
+  <!-- ==================== FEATURE 2: TELEMETRIA & GRÁFICOS EM TEMPO REAL ==================== -->
+  <section id="view-telemetria" class="view-panel">
+    <div class="profiles-hero">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h1 class="hero-title">Monitoramento de Hardware em Tempo Real</h1>
+          <p class="hero-subtitle">Gráficos de 60 segundos com taxa de atualização de 1 Hz. Sensores e métricas 100% locais.</p>
+        </div>
+        <div class="live-pill">
+          <span class="pulse-indicator"></span>
+          <span class="mono bold" id="telemetria-live-badge">SISTEMA ATIVO</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grid de Gráficos em Tempo Real -->
+    <div class="charts-quad-grid">
+      
+      <!-- Gráfico 1: CPU -->
+      <div class="glass-card chart-card">
+        <div class="chart-header">
+          <div class="chart-header-left">
+            <span class="chart-badge cyan">CPU</span>
+            <span class="chart-title" id="telem-cpu-name">Processador</span>
+          </div>
+          <div class="chart-header-right">
+            <span class="chart-value mono cyan" id="telem-cpu-val">0.0%</span>
+            <span class="chart-sub-metric" id="telem-cpu-extra">0 MHz · --°C</span>
+          </div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="canvas-cpu" width="480" height="140"></canvas>
+        </div>
+        <div class="chart-footer">
+          <span id="telem-cpu-cores">-- Núcleos Físicos / -- Lógicos</span>
+          <span class="chart-legend"><span class="legend-dot cyan"></span>Uso (%) nos últimos 60s</span>
+        </div>
+      </div>
+
+      <!-- Gráfico 2: GPU NVIDIA -->
+      <div class="glass-card chart-card">
+        <div class="chart-header">
+          <div class="chart-header-left">
+            <span class="chart-badge green">GPU</span>
+            <span class="chart-title" id="telem-gpu-name">Placa de Vídeo</span>
+          </div>
+          <div class="chart-header-right">
+            <span class="chart-value mono green" id="telem-gpu-val">0.0%</span>
+            <span class="chart-sub-metric" id="telem-gpu-extra">VRAM: 0 MB · --°C</span>
+          </div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="canvas-gpu" width="480" height="140"></canvas>
+        </div>
+        <div class="chart-footer">
+          <span id="telem-gpu-vram-total">Memória Dedicada: -- MB</span>
+          <span class="chart-legend"><span class="legend-dot green"></span>Carga da GPU (%)</span>
+        </div>
+      </div>
+
+      <!-- Gráfico 3: Memória RAM -->
+      <div class="glass-card chart-card">
+        <div class="chart-header">
+          <div class="chart-header-left">
+            <span class="chart-badge purple">RAM</span>
+            <span class="chart-title">Memória do Sistema</span>
+          </div>
+          <div class="chart-header-right">
+            <span class="chart-value mono purple" id="telem-ram-val">0.0%</span>
+            <span class="chart-sub-metric" id="telem-ram-extra">0 / 0 MB</span>
+          </div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="canvas-ram" width="480" height="140"></canvas>
+        </div>
+        <div class="chart-footer">
+          <span id="telem-ram-avail">Disponível: -- MB</span>
+          <span class="chart-legend"><span class="legend-dot purple"></span>Alocação (%)</span>
+        </div>
+      </div>
+
+      <!-- Gráfico 4: Latência de Rede (Ping) -->
+      <div class="glass-card chart-card">
+        <div class="chart-header">
+          <div class="chart-header-left">
+            <span class="chart-badge blue">REDE</span>
+            <span class="chart-title">Latência Contínua (RTT)</span>
+          </div>
+          <div class="chart-header-right">
+            <span class="chart-value mono blue" id="telem-ping-val">-- ms</span>
+            <span class="chart-sub-metric" id="telem-ping-target">Alvo: 8.8.8.8</span>
+          </div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="canvas-ping" width="480" height="140"></canvas>
+        </div>
+        <div class="chart-footer">
+          <span id="telem-throttling-badge">Throttling: Normal</span>
+          <span class="chart-legend"><span class="legend-dot blue"></span>Tempo de Resposta (ms)</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tabela de Processos Mais Ativos -->
+    <div class="glass-card" style="margin-top: 16px;">
       <div class="card-header">
         <div class="card-header-icon cpu">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
         </div>
         <div>
-          <h2 class="card-title">Métricas de Processador (CPU) em Tempo Real</h2>
-          <p class="card-subtitle">Leitura contínua enquanto esta aba estiver aberta. Dados reais obtidos diretamente dos contadores de desempenho nativos do Windows.</p>
+          <h2 class="card-title">Processos com Maior Consumo de CPU</h2>
+          <p class="card-subtitle">Identificação em tempo real dos executáveis que mais exigem recursos de processamento.</p>
         </div>
       </div>
 
-      <div class="cpu-monitor-grid" style="margin-top:16px;">
-        <div class="cpu-stat-box">
-          <span class="cpu-stat-num" id="cpu-total-val">0.0%</span>
-          <span class="cpu-stat-sub">Uso Total de CPU</span>
-          <div class="cpu-bar-bg" style="margin-top:8px;">
-            <div class="cpu-bar-fill" id="cpu-bar-fill" style="width: 0%;"></div>
-          </div>
-        </div>
-        <div class="cpu-stat-box">
-          <span class="cpu-stat-num" id="cpu-cores-val">—</span>
-          <span class="cpu-stat-sub">Núcleos Físicos / Lógicos</span>
-          <div class="field-hint" style="margin-top:8px;" id="cpu-thermal-notice">Temperatura/Throttling: Não disponível neste hardware</div>
-        </div>
-      </div>
-
-      <div style="margin-top:14px;">
-        <h4 style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:6px;">Processos Mais Consumidores:</h4>
-        <div class="terminal-block" id="cpu-top-processes">
-          <div>Lendo processos em execução…</div>
-        </div>
+      <div id="telem-top-processes" class="processes-list-wrap" style="margin-top:14px;">
+        <p class="muted-text">Amostrando processos do sistema…</p>
       </div>
     </div>
-
-    <!-- Gerenciador de Inicialização -->
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon startup">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Programas na Inicialização</h2>
-          <p class="card-subtitle">Controle quais softwares iniciam automaticamente com o Windows para acelerar o boot.</p>
-        </div>
-        <div class="header-actions">
-          <button class="btn-secondary small-btn" id="btn-recarregar-startup">Recarregar</button>
-        </div>
-      </div>
-
-      <div class="startup-list" id="lista-startup" style="margin-top:16px;">
-        <p class="muted-text">Carregando programas de inicialização…</p>
-      </div>
-    </div>
-
-    <!-- Unidades de Disco & TRIM -->
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon disk">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Saúde das Unidades & TRIM Seguro</h2>
-          <p class="card-subtitle">Identificação inteligente de SSDs (TRIM) e HDDs (Desfragmentação) para maximizar a vida útil e velocidade de leitura.</p>
-        </div>
-      </div>
-
-      <div class="drives-grid" id="lista-drives" style="margin-top:16px;">
-        <p class="muted-text">Carregando informações de disco…</p>
-      </div>
-    </div>
-
-    <!-- Central de Reparo DISM / SFC -->
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon repair">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Central de Integridade de Sistema (DISM / SFC)</h2>
-          <p class="card-subtitle">Auditoria não-destrutiva de integridade via `DISM /CheckHealth` e `sfc /verifyonly` em modo somente leitura.</p>
-        </div>
-        <div class="header-actions">
-          <button class="btn-secondary small-btn" id="btn-auditar-reparo">Auditar Integridade</button>
-        </div>
-      </div>
-      <div id="reparo-resultado" style="margin-top:14px;"></div>
-    </div>
-
-    <!-- Benchmark de DNS & DoH -->
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon dns">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Benchmark de DNS & Resolvedores DoH</h2>
-          <p class="card-subtitle">Mede o tempo real de resposta dos servidores DNS mais rápidos e seguros do mundo.</p>
-        </div>
-        <div class="header-actions">
-          <button class="btn-secondary small-btn" id="btn-testar-dns">Testar Servidores DNS</button>
-        </div>
-      </div>
-
-      <div class="dns-current-card" id="dns-atual" aria-live="polite">
-        <span class="pulse-spinner"></span>
-        <span>Lendo o DNS usado pela conexão ativa…</span>
-      </div>
-
-      <div id="dns-resultado" style="margin-top:16px;">
-        <p class="muted-text">Clique em "Testar Servidores DNS" para medir a velocidade de resolução.</p>
-      </div>
-    </div>
-
-    <!-- Limpeza de Dispositivos Fantasmas -->
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon pnp">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Limpeza de Dispositivos Fantasmas (Ghost PnP Devices)</h2>
-          <p class="card-subtitle">Detecta e remove com segurança nós de dispositivos USB, adaptadores e periféricos antigos desconectados que ocupam handles e IRQs.</p>
-        </div>
-        <div class="header-actions">
-          <button class="btn-secondary small-btn" id="btn-escanear-pnp">Buscar Dispositivos</button>
-          <button class="btn-primary small-btn" id="btn-limpar-pnp" style="display:none;">Limpar Selecionados</button>
-        </div>
-      </div>
-
-      <div id="pnp-resultado" style="margin-top:16px;">
-        <p class="muted-text">Clique em "Buscar Dispositivos" para verificar se há dispositivos desconectados ou órfãos no sistema.</p>
-      </div>
-    </div>
-
   </section>
 
-  <!-- ==================== ABA 3: AJUSTES AVANÇADOS (6 CATEGORIAS) ==================== -->
+  <!-- ==================== FEATURE 3: AJUSTES AVANÇADOS (CATÁLOGO) ==================== -->
   <section id="view-otim" class="view-panel">
 
     <!-- Card de Saúde e Status -->
@@ -343,7 +331,7 @@
     <div class="filter-toolbar">
       <div class="search-field">
         <svg class="search-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="busca-tweak" type="text" placeholder="Buscar otimização (ex: menus, jogos, ssd, bing, latência)..." autocomplete="off" spellcheck="false">
+        <input id="busca-tweak" type="text" placeholder="Buscar otimização (ex: nvidia, menus, ssd, bing, latência)..." autocomplete="off" spellcheck="false">
         <div class="search-right">
           <kbd class="shortcut-key">Ctrl+F</kbd>
           <button id="btn-limpar-busca" class="clear-search-btn" title="Limpar busca (Esc)" hidden>&times;</button>
@@ -353,8 +341,8 @@
       <div class="filter-pills-wrap">
         <div class="pills-scroll" id="filtros-categoria">
           <button class="pill-btn on" data-cat="todas">Todas</button>
+          <button class="pill-btn" data-cat="Jogos">Jogos & GPU</button>
           <button class="pill-btn" data-cat="Efeitos visuais">Efeitos</button>
-          <button class="pill-btn" data-cat="Jogos">Jogos</button>
           <button class="pill-btn" data-cat="Internet e rede">Rede</button>
           <button class="pill-btn" data-cat="Sistema">Sistema</button>
           <button class="pill-btn" data-cat="Armazenamento">Disco & SSD</button>
@@ -373,172 +361,248 @@
     </div>
 
     <!-- Lista de Otimizações -->
-    <div class="tweaks-container" id="lista"></div>
+    <div id="lista" class="tweak-list"></div>
+
+    <!-- Barra Inferior Flutuante de Ação em Lote -->
+    <footer id="barra" class="action-dock" style="display:none;">
+      <div class="dock-left">
+        <span class="dock-badge" id="selecionados-badge">0</span>
+        <span class="dock-label">selecionados</span>
+      </div>
+      <div class="dock-right">
+        <button class="btn-secondary" id="btn-simular" title="Verificar resultado sem fazer alterações">Simular</button>
+        <button class="btn-primary" id="btn-aplicar">Aplicar Selecionados</button>
+      </div>
+    </footer>
   </section>
 
-  <!-- ==================== ABA 4: INTERNET & REDE ==================== -->
+  <!-- ==================== FEATURE 4: INTERNET & REDE ==================== -->
   <section id="view-rede" class="view-panel">
     
-    <!-- Teste de MTU -->
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon net">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Otimizador de MTU (Tamanho Máximo de Pacote)</h2>
-          <p class="card-subtitle">Identifica o tamanho ideal de pacote para evitar fragmentação e reduzir atrasos em jogos e chamadas.</p>
-        </div>
-      </div>
-
-      <div class="action-inline-form">
-        <div class="input-with-label">
-          <label for="destino">Servidor de teste</label>
-          <input id="destino" type="text" value="1.1.1.1" spellcheck="false" placeholder="Ex: 1.1.1.1 ou 8.8.8.8">
-        </div>
-        <button class="btn-primary" id="btn-medir">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-          Medir MTU Ideal
-        </button>
-      </div>
-      <p class="field-hint">Diagnóstico não-destrutivo baseado na técnica de ping com flag Don't Fragment (DF).</p>
-      
-      <div id="mtu-resultado"></div>
+    <div class="profiles-hero">
+      <h1 class="hero-title">Otimização de Internet & Conectividade</h1>
+      <p class="hero-subtitle">Redução de latência de pacotes (bufferbloat), sintonia de MTU e benchmarks de resolvedores DNS criptografados.</p>
     </div>
 
-    <!-- Comparador de Latência Antes/Depois -->
+    <!-- Teste de Latência & Comparativo Antes/Depois -->
     <div class="glass-card">
       <div class="card-header">
-        <div class="card-header-icon latency">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+        <div class="card-header-icon network">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
         </div>
         <div>
-          <h2 class="card-title">Comparador de Latência & Estabilidade</h2>
-          <p class="card-subtitle">Mede e compara o ping (mínimo, médio, máximo e desvio-padrão) antes e depois de aplicar alterações.</p>
+          <h2 class="card-title">Medição e Comparativo de Latência (Ping / Jitter)</h2>
+          <p class="card-subtitle">Compare a estabilidade da conexão antes e depois de aplicar as otimizações de rede.</p>
         </div>
       </div>
 
-      <div class="latency-grid">
+      <div class="latency-control-grid" style="margin-top:16px;">
+        <div class="field-wrap">
+          <label class="field-label" for="destino">Servidor de Teste / Host de Jogos</label>
+          <input type="text" id="destino" value="8.8.8.8" class="text-field" placeholder="Ex: 8.8.8.8 ou 1.1.1.1">
+        </div>
+        <div class="field-wrap">
+          <label class="field-label" for="pacotes">Número de Pacotes</label>
+          <input type="number" id="pacotes" value="10" min="5" max="30" class="text-field">
+        </div>
+      </div>
+
+      <div class="latency-cards-grid" style="margin-top:16px;">
         <div class="latency-card">
-          <div class="lat-label">Medição ANTERIOR</div>
+          <div class="lat-label">1. Medição BASE (Antes)</div>
           <div class="lat-val" id="lat-antes-val">—</div>
-          <button class="btn-secondary small-btn" id="btn-medir-antes">Gravar Como "Antes"</button>
+          <button class="btn-primary small-btn" id="btn-medir-antes">1. Medir Antes</button>
         </div>
         <div class="latency-card">
-          <div class="lat-label">Medição ATUAL</div>
+          <div class="lat-label">2. Medição ATUAL (Depois)</div>
           <div class="lat-val" id="lat-depois-val">—</div>
-          <button class="btn-secondary small-btn" id="btn-medir-depois" disabled>Medir Agora</button>
+          <button class="btn-secondary small-btn" id="btn-medir-depois" disabled>2. Medir Depois</button>
         </div>
       </div>
       <div id="comparativo-resultado" style="margin-top:14px;"></div>
     </div>
 
-    <!-- Perfis Granulares de Rede -->
-    <div class="glass-card">
+    <!-- Benchmark de DNS & DoH com 1-Click Apply -->
+    <div class="glass-card" style="margin-top: 16px;">
       <div class="card-header">
-        <div class="card-header-icon profile">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <div class="card-header-icon dns">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         </div>
         <div>
-          <h2 class="card-title">Perfis Pré-Configurados de Rede</h2>
-          <p class="card-subtitle">Conjuntos balanceados para cenários específicos com reversão transparente e ressalvas honestas.</p>
+          <h2 class="card-title">Benchmark de DNS & Resolvedores DoH</h2>
+          <p class="card-subtitle">Mede o tempo real de resposta dos servidores DNS mais rápidos e permite aplicá-los com 1 clique.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-testar-dns">Testar Servidores DNS</button>
         </div>
       </div>
 
-      <div class="net-profiles-grid" id="perfis-lista">
-        <p class="muted-text">Carregando perfis de rede…</p>
+      <div class="dns-current-card" id="dns-atual" aria-live="polite" style="margin-top:14px;">
+        <span class="pulse-spinner"></span>
+        <span>Lendo o DNS usado pela conexão ativa…</span>
+      </div>
+
+      <div id="dns-resultado" style="margin-top:16px;">
+        <p class="muted-text">Clique em "Testar Servidores DNS" para medir a velocidade de resolução.</p>
+      </div>
+    </div>
+
+    <!-- Otimizador de MTU -->
+    <div class="glass-card" style="margin-top: 16px;">
+      <div class="card-header">
+        <div class="card-header-icon mtu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Sintonia e Medição de MTU (Maximum Transmission Unit)</h2>
+          <p class="card-subtitle">Descobre o maior tamanho de pacote sem fragmentação para eliminar perda de pacotes em jogos e downloads.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-medir-mtu">Medir MTU Ótimo</button>
+        </div>
+      </div>
+
+      <div id="mtu-resultado" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- Perfis de Sintonia de Rede -->
+    <div class="glass-card" style="margin-top: 16px;">
+      <div class="card-header">
+        <div class="card-header-icon netperf">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Presets Especializados de Rede</h2>
+          <p class="card-subtitle">Configurações pré-definidas para cenários específicos de uso.</p>
+        </div>
+      </div>
+
+      <div class="network-profiles-grid" id="lista-perfis-rede" style="margin-top:16px;"></div>
+    </div>
+
+  </section>
+
+  <!-- ==================== FEATURE 5: DIAGNÓSTICO & REPARO ==================== -->
+  <section id="view-diag" class="view-panel">
+    
+    <div class="profiles-hero">
+      <h1 class="hero-title">Diagnóstico e Integridade do Sistema</h1>
+      <p class="hero-subtitle">Auditorias não-destrutivas, verificação de integridade, saúde de armazenamento e limpeza de periféricos fantasmas.</p>
+    </div>
+
+    <!-- Gerenciador de Inicialização (Startup) -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon startup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Programas na Inicialização do Windows (Startup)</h2>
+          <p class="card-subtitle">Desative programas em segundo plano que aumentam o tempo de boot do computador.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-recarregar-startup">Recarregar</button>
+        </div>
+      </div>
+
+      <div class="startup-list-container" id="startup-container" style="margin-top:16px;">
+        <div class="health-loading"><span class="pulse-spinner"></span><span>Carregando programas de inicialização…</span></div>
+      </div>
+    </div>
+
+    <!-- Auditoria de Integridade DISM / SFC -->
+    <div class="glass-card" style="margin-top: 16px;">
+      <div class="card-header">
+        <div class="card-header-icon repair">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Auditoria de Integridade do Windows (DISM / SFC)</h2>
+          <p class="card-subtitle">Auditoria não-destrutiva de integridade via `DISM /CheckHealth` e `sfc /verifyonly` em modo somente leitura.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-auditar-reparo">Auditar Integridade</button>
+        </div>
+      </div>
+      <div id="reparo-resultado" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- Unidades de Armazenamento & TRIM -->
+    <div class="glass-card" style="margin-top: 16px;">
+      <div class="card-header">
+        <div class="card-header-icon disk">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Armazenamento, TRIM & Saúde dos Discos</h2>
+          <p class="card-subtitle">Inspeção de volumes SSD/HDD, execução de TRIM seguro e verificação de integridade.</p>
+        </div>
+      </div>
+
+      <div class="disks-grid" id="disks-container" style="margin-top:16px;">
+        <div class="health-loading"><span class="pulse-spinner"></span><span>Detectando discos e volumes…</span></div>
+      </div>
+    </div>
+
+    <!-- Limpeza de Dispositivos Fantasmas -->
+    <div class="glass-card" style="margin-top: 16px;">
+      <div class="card-header">
+        <div class="card-header-icon pnp">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Limpeza de Dispositivos Fantasmas (Ghost PnP Devices)</h2>
+          <p class="card-subtitle">Detecta e remove com segurança nós de dispositivos USB e adaptadores antigos desconectados que ocupam handles.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-escanear-pnp">Buscar Dispositivos</button>
+          <button class="btn-primary small-btn" id="btn-limpar-pnp" style="display:none;">Limpar Selecionados</button>
+        </div>
+      </div>
+
+      <div id="pnp-resultado" style="margin-top:16px;">
+        <p class="muted-text">Clique em "Buscar Dispositivos" para verificar se há periféricos desconectados no sistema.</p>
       </div>
     </div>
 
   </section>
 
-  <!-- ==================== ABA 5: HISTÓRICO & AUDITORIA ==================== -->
+  <!-- ==================== FEATURE 6: HISTÓRICO & AUDITORIA ==================== -->
   <section id="view-hist" class="view-panel">
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon history">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Linha do Tempo de Alterações & Lotes</h2>
-          <p class="card-subtitle">Auditoria completa gravada em disco (`%LOCALAPPDATA%\Optimizer\history.jsonl`).</p>
-        </div>
-        <div class="header-actions">
-          <button class="btn-secondary small-btn" id="btn-abrir-hist">Abrir Arquivo</button>
-        </div>
-      </div>
+    <div class="profiles-hero">
+      <h1 class="hero-title">Histórico de Transações & Snapshots</h1>
+      <p class="hero-subtitle">Auditoria completa de todas as alterações feitas na máquina com garantia de reversão transacional (Rollback).</p>
+    </div>
 
-      <div class="timeline" id="hist-lista">
-        <p class="muted-text">Carregando histórico…</p>
+    <div class="glass-card">
+      <div id="historico-container">
+        <div class="health-loading"><span class="pulse-spinner"></span><span>Carregando histórico de operações…</span></div>
       </div>
     </div>
   </section>
 
 </main>
 
-<!-- Barra Inferior de Ações (Dock Fixo para Ajustes Avançados) -->
-<div class="action-dock" id="barra" style="display:none;">
-  <div class="dock-container">
-    <div class="dock-info">
-      <div class="dock-title">
-        <span id="selecionados-count">0</span> otimizações selecionadas
-      </div>
-      <div class="dock-sub" id="selecionados-sub">
-        Nenhum item alterado pendente de aplicação
-      </div>
-    </div>
-
-    <div class="dock-actions">
-      <button class="dock-btn outline" id="btn-recomendados" title="Marcar automaticamente apenas ajustes seguros e recomendados">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        Recomendados
-      </button>
-      <button class="dock-btn secondary" id="btn-simular" disabled title="Verificar o que seria gravado sem fazer nenhuma alteração no Windows">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-        Simular
-      </button>
-      <button class="dock-btn primary" id="btn-aplicar" disabled title="Gravar alterações selecionadas com snapshot e backup">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        Aplicar
-      </button>
-      <button class="dock-btn danger" id="btn-desfazer-tudo" disabled title="Reverter todas as configurações para o estado original">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-        Desfazer Tudo
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- ==================== VISUALIZADOR DE OPERAÇÕES & TELEMETRIA ==================== -->
-<aside class="visualizer-drawer" id="visualizer-drawer" hidden aria-label="Visualizador de Operações">
+<!-- Drawer / Gaveta Lateral: Visualizador e Inspetor de Operações -->
+<aside class="visualizer-drawer" id="visualizer-drawer" hidden>
   <div class="vis-header">
     <div class="vis-header-left">
       <span class="radar-dot active"></span>
-      <span class="vis-title">Inspetor e Telemetria de Sistema</span>
-      <div class="vis-tabs">
-        <button class="vis-tab on" data-vistab="stream">Terminal de Operações</button>
-        <button class="vis-tab" data-vistab="diff">Diff de Chaves & Registro</button>
-      </div>
+      <h3 class="vis-title">Inspetor em Tempo Real</h3>
     </div>
-    <div class="vis-header-right">
-      <label class="vis-auto-scroll" title="Rolar automaticamente para a última operação">
-        <input type="checkbox" id="chk-vis-autoscroll" checked>
-        <span>Auto-scroll</span>
-      </label>
-      <button class="vis-btn-icon" id="btn-vis-copiar" title="Copiar log completo para a área de transferência">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        Copiar
-      </button>
-      <button class="vis-btn-icon" id="btn-vis-limpar" title="Limpar logs">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-        Limpar
-      </button>
-      <button class="vis-close-btn" id="btn-vis-fechar" title="Fechar visualizador">&times;</button>
+    <div class="vis-header-actions">
+      <button class="vis-icon-btn" id="vis-btn-clear" title="Limpar terminal">&empty;</button>
+      <button class="vis-icon-btn" id="vis-btn-close" title="Fechar painel (Esc)">&times;</button>
     </div>
   </div>
 
+  <div class="vis-tabs">
+    <button class="vis-tab on" data-vistab="stream">Terminal de Operações</button>
+    <button class="vis-tab" data-vistab="diff">Visual Diff (Registro)</button>
+  </div>
+
   <div class="vis-body">
-    <!-- Sub-aba 1: Stream de Terminal -->
+    <!-- Sub-aba 1: Stream de Logs -->
     <div class="vis-tab-content on" id="vistab-stream">
       <div class="vis-terminal-stream" id="vis-stream-log">
         <div class="vis-log-empty">Nenhuma operação realizada ainda. Use Diagnosticar ou Aplicar para ver o fluxo em tempo real.</div>
@@ -567,7 +631,7 @@
       <span class="vis-stat-val" id="stat-snaps">0</span>
     </div>
     <div class="vis-stat-item">
-      <span class="vis-stat-label">Tempo Médio de Resposta:</span>
+      <span class="vis-stat-label">Tempo Médio:</span>
       <span class="vis-stat-val" id="stat-avgtime">0.2 ms</span>
     </div>
   </div>

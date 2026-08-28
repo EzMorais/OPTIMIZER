@@ -814,6 +814,74 @@ func (a *App) LimparDispositivosFantasmas(instanceIDs []string) ResultadoLimpeza
 	}
 }
 
+// TelemetriaAoVivoUI agrega métricas em tempo real para os gráficos da UI.
+type TelemetriaAoVivoUI struct {
+	Timestamp         int64                     `json:"timestamp"`
+	CPUUsagePercent   float64                   `json:"cpuUsagePercent"`
+	CPUFrequencyMHz   float64                   `json:"cpuFrequencyMhz"`
+	CPUTempCelsius    *float64                  `json:"cpuTempCelsius,omitempty"`
+	GPUUsagePercent   float64                   `json:"gpuUsagePercent"`
+	GPUMemoryUsedMB   float64                   `json:"gpuMemoryUsedMb"`
+	GPUMemoryTotalMB  float64                   `json:"gpuMemoryTotalMb"`
+	GPUTempCelsius    *float64                  `json:"gpuTempCelsius,omitempty"`
+	RAMUsedMB         float64                   `json:"ramUsedMb"`
+	RAMTotalMB        float64                   `json:"ramTotalMb"`
+	RAMUsedPercent    float64                   `json:"ramUsedPercent"`
+	ThermalThrottled  bool                      `json:"thermalThrottled"`
+	PhysicalCores     int                       `json:"physicalCores"`
+	LogicalProcessors int                       `json:"logicalProcessors"`
+	TopProcesses      []telemetry.ProcessMetric `json:"topProcesses"`
+}
+
+// ObterTelemetriaAoVivo captura um snapshot instantâneo do hardware para os gráficos da UI.
+func (a *App) ObterTelemetriaAoVivo() TelemetriaAoVivoUI {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var provider telemetry.Provider = telemetry.NewWindowsLiveProvider()
+	if a.benchCollector != nil && a.benchCollector.Provider != nil {
+		provider = a.benchCollector.Provider
+	}
+
+	sample, err := provider.CollectSample(ctx)
+	if err != nil {
+		return TelemetriaAoVivoUI{
+			Timestamp: time.Now().Unix(),
+		}
+	}
+
+	staticInfo, _ := provider.GetHardwareInfo(ctx)
+	ramTotal := float64(staticInfo.TotalRAMMB)
+	if ramTotal == 0 {
+		ramTotal = sample.RAMTotalMB
+	}
+	if ramTotal == 0 {
+		ramTotal = 16384
+	}
+	ramPercent := 0.0
+	if ramTotal > 0 {
+		ramPercent = (sample.RAMUsedMB / ramTotal) * 100
+	}
+
+	return TelemetriaAoVivoUI{
+		Timestamp:         sample.Timestamp.Unix(),
+		CPUUsagePercent:   sample.CPUUsagePercent,
+		CPUFrequencyMHz:   sample.CPUFrequencyMHz,
+		CPUTempCelsius:    sample.CPUTempCelsius,
+		GPUUsagePercent:   sample.GPUUsagePercent,
+		GPUMemoryUsedMB:   sample.GPUMemoryUsedMB,
+		GPUMemoryTotalMB:  float64(staticInfo.TotalGPUMemMB),
+		GPUTempCelsius:    sample.GPUTempCelsius,
+		RAMUsedMB:         sample.RAMUsedMB,
+		RAMTotalMB:        ramTotal,
+		RAMUsedPercent:    ramPercent,
+		ThermalThrottled:  sample.ThermalThrottling,
+		PhysicalCores:     staticInfo.PhysicalCores,
+		LogicalProcessors: staticInfo.LogicalCores,
+		TopProcesses:      sample.TopProcessesCPU,
+	}
+}
+
 // ---------------------------------------------------------------- Perfis de Uso (JOGO / CODING)
 
 // ListarPerfisUso lista os perfis de uso fechados (JOGO e CODING).

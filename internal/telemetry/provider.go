@@ -41,6 +41,10 @@ type psTelemetryRaw struct {
 	GPUTemp       float64 `json:"gpuTemp"`
 	HasGPUTemp    bool    `json:"hasGpuTemp"`
 	Throttling    bool    `json:"throttling"`
+	DiskReadMB    float64 `json:"diskReadMB"`
+	DiskWriteMB   float64 `json:"diskWriteMB"`
+	NetRxKB       float64 `json:"netRxKB"`
+	NetTxKB       float64 `json:"netTxKB"`
 	TopCPUProc    string  `json:"topCpuProc"`
 	TopCPUVal     float64 `json:"topCpuVal"`
 	TopGPUProc    string  `json:"topGpuProc"`
@@ -150,6 +154,10 @@ try {
 		sample.GPUMemoryUsedMB = raw.GPUMemUsedMB
 		sample.GPUMemoryTotalMB = raw.GPUMemTotalMB
 		sample.ThermalThrottling = raw.Throttling
+		sample.DiskReadMBps = raw.DiskReadMB
+		sample.DiskWriteMBps = raw.DiskWriteMB
+		sample.NetworkRxKBps = raw.NetRxKB
+		sample.NetworkTxKBps = raw.NetTxKB
 		sample.TopProcessGPU = raw.TopGPUProc
 
 		if raw.HasCPUTemp {

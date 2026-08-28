@@ -50,16 +50,16 @@ func TestAppDiagnosticar(t *testing.T) {
 	app := novoAppTeste(t)
 
 	diagPessoal := app.Diagnosticar("pessoal")
-	if diagPessoal.Total != 44 {
-		t.Errorf("Total pessoal = %d, esperado 44", diagPessoal.Total)
+	if diagPessoal.Total != 46 {
+		t.Errorf("Total pessoal = %d, esperado 46", diagPessoal.Total)
 	}
 	if diagPessoal.Perfil != "pessoal" {
 		t.Errorf("Perfil = %s, esperado pessoal", diagPessoal.Perfil)
 	}
 
 	diagTrabalho := app.Diagnosticar("trabalho")
-	if diagTrabalho.Total != 31 {
-		t.Errorf("Total trabalho = %d, esperado 31", diagTrabalho.Total)
+	if diagTrabalho.Total != 32 {
+		t.Errorf("Total trabalho = %d, esperado 32", diagTrabalho.Total)
 	}
 	if diagTrabalho.Perfil != "trabalho" {
 		t.Errorf("Perfil = %s, esperado trabalho", diagTrabalho.Perfil)
@@ -250,8 +250,8 @@ func TestAppResumoVisaoMostraCoberturaECategoriasDoCatalogo(t *testing.T) {
 	}
 
 	visao := app.ResumoVisao("pessoal")
-	if visao.TotalAjustes != 44 {
-		t.Errorf("total de ajustes = %d, esperado 44", visao.TotalAjustes)
+	if visao.TotalAjustes != 46 {
+		t.Errorf("total de ajustes = %d, esperado 46", visao.TotalAjustes)
 	}
 	if visao.Aplicados != antes.Aplicados+1 {
 		t.Errorf("aplicados = %d, esperado %d após aplicar um ajuste", visao.Aplicados, antes.Aplicados+1)
@@ -330,5 +330,16 @@ func TestAppTelemetriaAoVivo(t *testing.T) {
 	}
 	if telem.PhysicalCores != 8 || telem.LogicalProcessors != 16 {
 		t.Errorf("Cores = %d/%d, esperado 8/16", telem.PhysicalCores, telem.LogicalProcessors)
+	}
+}
+
+func TestAppExportarRelatorioSistema(t *testing.T) {
+	app := novoAppTeste(t)
+	relatorio := app.ExportarRelatorioSistema()
+	if !strings.Contains(relatorio, "Relatório Completo de Diagnóstico") {
+		t.Errorf("Relatório gerado inválido:\n%s", relatorio)
+	}
+	if !strings.Contains(relatorio, "Total de Ajustes") {
+		t.Errorf("Relatório deve conter contagem de ajustes:\n%s", relatorio)
 	}
 }

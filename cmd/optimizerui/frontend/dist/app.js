@@ -333,6 +333,21 @@ function ligarEventos() {
   $$(".btn-apply-profile").forEach((b) => b.addEventListener("click", () => aplicarPerfilUso(b.dataset.profile)));
   $$(".btn-restore-profile").forEach((b) => b.addEventListener("click", () => restaurarPerfilUso(b.dataset.profile)));
 
+  const btnExportarRelatorio = $("#btn-exportar-relatorio");
+  if (btnExportarRelatorio) {
+    btnExportarRelatorio.addEventListener("click", async () => {
+      try {
+        toast("Gerando relatório completo do sistema…", "info");
+        const relatorio = await App.ExportarRelatorioSistema();
+        if (relatorio) {
+          abrirModal("Relatório de Diagnóstico & Otimização", `<pre style="white-space:pre-wrap; font-family:var(--font-mono); font-size:12px; max-height:400px; overflow-y:auto; background:var(--bg-sunken); padding:12px; border-radius:var(--radius-md);">${esc(relatorio)}</pre>`);
+        }
+      } catch (e) {
+        toast("Erro ao exportar relatório: " + e, "err");
+      }
+    });
+  }
+
   const btnRecarregarStartup = $("#btn-recarregar-startup");
   if (btnRecarregarStartup) btnRecarregarStartup.addEventListener("click", carregarStartup);
 

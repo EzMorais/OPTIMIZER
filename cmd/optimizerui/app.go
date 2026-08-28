@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -828,6 +829,10 @@ type TelemetriaAoVivoUI struct {
 	RAMTotalMB        float64                   `json:"ramTotalMb"`
 	RAMUsedPercent    float64                   `json:"ramUsedPercent"`
 	ThermalThrottled  bool                      `json:"thermalThrottled"`
+	DiskReadMBps      float64                   `json:"diskReadMBps"`
+	DiskWriteMBps     float64                   `json:"diskWriteMBps"`
+	NetworkRxKBps     float64                   `json:"networkRxKBps"`
+	NetworkTxKBps     float64                   `json:"networkTxKBps"`
 	PhysicalCores     int                       `json:"physicalCores"`
 	LogicalProcessors int                       `json:"logicalProcessors"`
 	TopProcesses      []telemetry.ProcessMetric `json:"topProcesses"`
@@ -876,10 +881,43 @@ func (a *App) ObterTelemetriaAoVivo() TelemetriaAoVivoUI {
 		RAMTotalMB:        ramTotal,
 		RAMUsedPercent:    ramPercent,
 		ThermalThrottled:  sample.ThermalThrottling,
+		DiskReadMBps:      sample.DiskReadMBps,
+		DiskWriteMBps:     sample.DiskWriteMBps,
+		NetworkRxKBps:     sample.NetworkRxKBps,
+		NetworkTxKBps:     sample.NetworkTxKBps,
 		PhysicalCores:     staticInfo.PhysicalCores,
 		LogicalProcessors: staticInfo.LogicalCores,
 		TopProcesses:      sample.TopProcessesCPU,
 	}
+}
+
+// ExportarRelatorioSistema gera um relatório consolidado com hardware, tweaks ativos, rede e integridade.
+func (a *App) ExportarRelatorioSistema() string {
+	var sb strings.Builder
+	sb.WriteString("# Relatório Completo de Diagnóstico & Otimização do Sistema\n\n")
+	sb.WriteString(fmt.Sprintf("**Gerado em:** %s\n", time.Now().Format("02/01/2006 15:04:05")))
+	sb.WriteString(fmt.Sprintf("**Perfil de Uso Ativo:** %s\n\n", a.ObterPerfilAtivo()))
+
+	sb.WriteString("## 1. Hardware & Telemetria Atual\n\n")
+	telem := a.ObterTelemetriaAoVivo()
+	sb.WriteString(fmt.Sprintf("- **CPU:** %.1f%% de uso (%.0f MHz, %d físicos / %d lógicos)\n", telem.CPUUsagePercent, telem.CPUFrequencyMHz, telem.PhysicalCores, telem.LogicalProcessors))
+	sb.WriteString(fmt.Sprintf("- **GPU:** %.1f%% de uso (VRAM: %.0f / %.0f MB)\n", telem.GPUUsagePercent, telem.GPUMemoryUsedMB, telem.GPUMemoryTotalMB))
+	sb.WriteString(fmt.Sprintf("- **RAM:** %.0f MB / %.0f MB (%.1f%% alocado)\n\n", telem.RAMUsedMB, telem.RAMTotalMB, telem.RAMUsedPercent))
+
+	sb.WriteString("## 2. Status do Catálogo de Ajustes\n\n")
+	diag := a.Diagnosticar("pessoal")
+	sb.WriteString(fmt.Sprintf("- **Total de Ajustes:** %d\n", diag.Total))
+	sb.WriteString(fmt.Sprintf("- **Aplicados:** %d\n", diag.Aplicados))
+	sb.WriteString(fmt.Sprintf("- **Recomendados Pendentes:** %d\n\n", diag.RecomendadosPendentes))
+
+	sb.WriteString("## 3. Conectividade & DNS Ativo\n\n")
+	dns := a.ObterDNSAtual()
+	if dns.Interface != "" {
+		sb.WriteString(fmt.Sprintf("- **Interface Primária:** %s\n", dns.Interface))
+		sb.WriteString(fmt.Sprintf("- **Servidores DNS:** %s\n\n", strings.Join(dns.Servidores, ", ")))
+	}
+
+	return sb.String()
 }
 
 // ---------------------------------------------------------------- Perfis de Uso (JOGO / CODING)

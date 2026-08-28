@@ -86,6 +86,8 @@ const (
 	pathNvidiaClassPrimary  = `SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000`
 	pathNvidiaNvTweakGlobal = `SOFTWARE\NVIDIA Corporation\Global\NVTweak`
 	pathNvidiaNvCplOptIn    = `SOFTWARE\NVIDIA Corporation\NvControlPanel2\Client`
+	pathWindowsAI           = `SOFTWARE\Policies\Microsoft\Windows\WindowsAI`
+	pathKernelManager       = `SYSTEM\CurrentControlSet\Control\Session Manager\kernel`
 )
 
 func entries() []entry {
@@ -1156,6 +1158,52 @@ func entries() []entry {
 				Caveat:             "Evita tráfego de rede e consumo em segundo plano de processos auxiliares do driver de vídeo.",
 				Evidence:           "docs/catalogo/registro.md#nvidia-telemetry",
 				SortOrder:          215,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "privacidade.win11-recall-off",
+				DisplayName:    "Desativar análise contínua de IA e snapshots do Windows Recall",
+				Explanation:    "Desativa a captura de telas e análise contínua de atividade pelo recurso Recall e IA local do Windows 11 (24H2+).",
+				Cat:            tweak.CategoryPrivacyNonSecurity,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "A análise de dados e captura do Windows Recall está desativada.",
+				NotAppliedText: "A análise de IA e snapshots do Recall está ativa no sistema.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathWindowsAI, "DisableAIDataAnalysis", 1, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Recomendado para economizar I/O contínuo de SSD e preservar privacidade absoluta no Windows 11.",
+				Evidence:           "docs/catalogo/privacidade.md#windows-recall",
+				SortOrder:          220,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "jogos.hpet-synthetic-timers",
+				DisplayName:    "Otimizar resolução global de timer do Kernel (GlobalTimerResolution)",
+				Explanation:    "Garante resolução precisa de timer em tempo real (0.5ms - 1ms) sem depender de timers sintéticos de alto custo de interrupção.",
+				Cat:            tweak.CategoryGaming,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "Resolução global de timer otimizada no kernel.",
+				NotAppliedText: "Resolução global de timer no padrão do Windows.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathKernelManager, "GlobalTimerResolutionRequests", 1, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfilePersonal,
+				RequiresAdmin:      true,
+				Caveat:             "Melhora a consistência de frametime e reduz jitter de interrupções de hardware.",
+				Evidence:           "docs/catalogo/hardware-energia-gpu.md#timers",
+				SortOrder:          225,
 			},
 		},
 	}

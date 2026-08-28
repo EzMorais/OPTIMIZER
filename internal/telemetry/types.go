@@ -33,6 +33,10 @@ type MetricSample struct {
 	GPUMemoryTotalMB   float64         `json:"gpuMemoryTotalMB"`
 	GPUTempCelsius     *float64        `json:"gpuTempCelsius,omitempty"`
 	ThermalThrottling  bool            `json:"thermalThrottling"`
+	DiskReadMBps       float64         `json:"diskReadMBps"`
+	DiskWriteMBps      float64         `json:"diskWriteMBps"`
+	NetworkRxKBps      float64         `json:"networkRxKBps"`
+	NetworkTxKBps      float64         `json:"networkTxKBps"`
 	TopProcessesCPU    []ProcessMetric `json:"topProcessesCpu,omitempty"`
 	TopProcessGPU      string          `json:"topProcessGpu,omitempty"`
 }

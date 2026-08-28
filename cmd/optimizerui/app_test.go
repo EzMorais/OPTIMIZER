@@ -7,6 +7,7 @@ import (
 
 	"optimizer/internal/engine"
 	"optimizer/internal/history"
+	"optimizer/internal/telemetry"
 	"optimizer/internal/tweaks"
 	"optimizer/internal/winreg"
 )
@@ -167,3 +168,52 @@ func TestAppDispositivosFantasmas(t *testing.T) {
 		t.Errorf("esperado 0 removidos para lista vazia")
 	}
 }
+
+func TestAppBenchmarkFlow(t *testing.T) {
+	app := novoAppTeste(t)
+	// Configura mock collector
+	temp := 48.0
+	mock := &telemetry.MockProvider{
+		Samples: []telemetry.MetricSample{
+			{
+				CPUUsagePercent: 18.0,
+				RAMUsedMB:       4000,
+				RAMTotalMB:      16384,
+				GPUUsagePercent: 25.0,
+				CPUTempCelsius:  &temp,
+			},
+		},
+	}
+	app.benchCollector = telemetry.NewCollector(mock)
+
+	// 1. Iniciar benchmark pré
+	reportAntes, err := app.IniciarBenchmarkBase("jogo", 1)
+	if err != nil {
+		t.Fatalf("erro ao iniciar benchmark base: %v", err)
+	}
+	if reportAntes.SampleCount == 0 {
+		t.Error("esperado pelo menos 1 amostra no benchmark prévio")
+	}
+
+	// 2. Aplicar perfil com benchmark prévio
+	resApp := app.AplicarPerfilComBenchmark("jogo", true, reportAntes)
+	if len(resApp.Resultados) == 0 {
+		t.Error("esperado resultados ao aplicar perfil com benchmark")
+	}
+	if resApp.BatchID == "" {
+		t.Error("esperado BatchID gerado para o lote de perfil")
+	}
+
+	// 3. Iniciar benchmark pós
+	comp, err := app.IniciarBenchmarkPos("jogo", resApp.BatchID, 1)
+	if err != nil {
+		t.Fatalf("erro ao iniciar benchmark pos: %v", err)
+	}
+	if comp.ProfileKey != "jogo" {
+		t.Errorf("esperado ProfileKey = jogo, obteve %s", comp.ProfileKey)
+	}
+
+	// 4. Cancelar benchmark
+	app.CancelarBenchmark()
+}
+

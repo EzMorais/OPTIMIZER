@@ -530,6 +530,59 @@
   </div>
 </aside>
 
+<!-- Modal de Benchmark Observacional e Telemetria de Perfil -->
+<div class="modal-overlay" id="overlay-benchmark" hidden>
+  <div class="modal-card benchmark-modal-card">
+    <div class="modal-header">
+      <div class="modal-header-brand" style="display:flex; align-items:center; gap:8px;">
+        <span class="pulse-indicator"></span>
+        <h3 class="modal-title" id="bench-modal-titulo">Benchmark Observacional Obrigatório (60s)</h3>
+      </div>
+      <button class="modal-close" id="btn-bench-modal-x">&times;</button>
+    </div>
+    
+    <div class="modal-body" id="bench-modal-corpo">
+      <p class="card-subtitle" id="bench-modal-desc">
+        Coletando dados reais de telemetria da CPU, GPU e memória antes da aplicação do perfil. A medição é 100% não-destrutiva e observacional.
+      </p>
+
+      <div class="bench-progress-wrap" style="margin-top:16px;">
+        <div class="bench-progress-header" style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px;">
+          <span id="bench-progress-label">Amostrando hardware (0/60s)...</span>
+          <span id="bench-progress-percent" class="mono bold">0%</span>
+        </div>
+        <div class="bench-progress-bar-bg" style="height:8px; background:rgba(255,255,255,0.08); border-radius:999px; overflow:hidden;">
+          <div class="bench-progress-bar-fill" id="bench-progress-fill" style="width: 0%; height:100%; background:var(--accent); border-radius:999px; transition:width 0.3s ease;"></div>
+        </div>
+      </div>
+
+      <div class="bench-live-grid" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:16px;">
+        <div class="bench-stat-card" style="background:var(--bg-sunken); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
+          <span class="bench-stat-title" style="font-size:11px; text-transform:uppercase; color:var(--text-muted); display:block; font-weight:700;">Uso CPU</span>
+          <span class="bench-stat-value mono bold" id="bench-live-cpu" style="font-size:1.3rem; color:var(--accent); display:block;">0.0%</span>
+          <span class="bench-stat-extra" id="bench-live-cputemp" style="font-size:11px; color:var(--text-secondary);">Temp: Indisponível</span>
+        </div>
+        <div class="bench-stat-card" style="background:var(--bg-sunken); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
+          <span class="bench-stat-title" style="font-size:11px; text-transform:uppercase; color:var(--text-muted); display:block; font-weight:700;">Uso GPU</span>
+          <span class="bench-stat-value mono bold" id="bench-live-gpu" style="font-size:1.3rem; color:var(--accent); display:block;">0.0%</span>
+          <span class="bench-stat-extra" id="bench-live-gputemp" style="font-size:11px; color:var(--text-secondary);">Temp: Indisponível</span>
+        </div>
+        <div class="bench-stat-card" style="background:var(--bg-sunken); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
+          <span class="bench-stat-title" style="font-size:11px; text-transform:uppercase; color:var(--text-muted); display:block; font-weight:700;">Memória RAM</span>
+          <span class="bench-stat-value mono bold" id="bench-live-ram" style="font-size:1.3rem; color:var(--text-primary); display:block;">0 MB</span>
+          <span class="bench-stat-extra" style="font-size:11px; color:var(--text-secondary);">Uso do sistema</span>
+        </div>
+      </div>
+
+      <div id="bench-custom-content" style="margin-top:16px;"></div>
+    </div>
+
+    <div class="modal-footer" id="bench-modal-footer" style="display:flex; justify-content:flex-end; gap:8px;">
+      <button class="btn-secondary" id="btn-bench-cancelar">Cancelar Benchmark</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal de Resultados / Diálogo Genérico -->
 <div class="modal-overlay" id="overlay" hidden>
   <div class="modal-card">

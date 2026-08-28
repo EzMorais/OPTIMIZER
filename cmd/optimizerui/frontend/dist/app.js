@@ -255,7 +255,9 @@ function ligarEventos() {
         input.select();
       }
     } else if (e.key === "Escape") {
-      if (!$("#overlay").hidden) {
+      if (!$("#overlay-benchmark").hidden) {
+        fecharModalBenchmark();
+      } else if (!$("#overlay").hidden) {
         fecharModal();
       } else if (!$("#visualizer-drawer").hidden) {
         Visualizer.hide();
@@ -286,6 +288,11 @@ function ligarEventos() {
     if (viewEl) viewEl.classList.add("on");
     
     $("#barra").style.display = viewId === "otim" ? "flex" : "none";
+
+    // Cancela benchmark em andamento caso o usuário troque de aba
+    if (viewId !== "perfis" && benchmarkEmAndamento) {
+      fecharModalBenchmark();
+    }
 
     // Interrompe o polling de CPU se o usuário sair da aba Diagnóstico
     if (viewId !== "diag" && cpuTimer) {
@@ -327,6 +334,18 @@ function ligarEventos() {
 
   const btnLimparPnp = $("#btn-limpar-pnp");
   if (btnLimparPnp) btnLimparPnp.addEventListener("click", limparDispositivosFantasmas);
+
+  const btnBenchCancelar = $("#btn-bench-cancelar");
+  if (btnBenchCancelar) btnBenchCancelar.addEventListener("click", fecharModalBenchmark);
+
+  const btnBenchX = $("#btn-bench-modal-x");
+  if (btnBenchX) btnBenchX.addEventListener("click", fecharModalBenchmark);
+
+  if (window.runtime && window.runtime.EventsOn) {
+    window.runtime.EventsOn("benchmark:progress", (data) => {
+      atualizarProgressoBenchmark(data);
+    });
+  }
 
   const inputBusca = $("#busca-tweak");
   const btnLimpar = $("#btn-limpar-busca");
@@ -1398,45 +1417,252 @@ async function verificarPerfil(key) {
   }
 }
 
+/* ==========================================================================
+   Benchmark Observacional & Telemetria Obrigatória Pré/Pós Perfil
+   ========================================================================== */
+
+let benchmarkEmAndamento = false;
+
+function abrirModalBenchmark(titulo, desc) {
+  $("#bench-modal-titulo").textContent = titulo;
+  $("#bench-modal-desc").textContent = desc;
+  $("#bench-progress-fill").style.width = "0%";
+  $("#bench-progress-percent").textContent = "0%";
+  $("#bench-progress-label").textContent = "Amostrando hardware (0/60s)...";
+  $("#bench-live-cpu").textContent = "0.0%";
+  $("#bench-live-gpu").textContent = "0.0%";
+  $("#bench-live-ram").textContent = "0 MB";
+  $("#bench-live-cputemp").textContent = "Temp: Indisponível";
+  $("#bench-live-gputemp").textContent = "Temp: Indisponível";
+  $("#bench-custom-content").innerHTML = "";
+  $("#overlay-benchmark").hidden = false;
+  benchmarkEmAndamento = true;
+}
+
+function fecharModalBenchmark() {
+  $("#overlay-benchmark").hidden = true;
+  if (benchmarkEmAndamento) {
+    benchmarkEmAndamento = false;
+    App.CancelarBenchmark();
+  }
+}
+
+function atualizarProgressoBenchmark(data) {
+  if (!data) return;
+  const pct = Math.min(100, Math.max(0, data.percent || 0));
+  $("#bench-progress-fill").style.width = `${pct.toFixed(0)}%`;
+  $("#bench-progress-percent").textContent = `${pct.toFixed(0)}%`;
+  $("#bench-progress-label").textContent = `Amostrando hardware (${data.current || 0}/${data.total || 60}s)...`;
+
+  $("#bench-live-cpu").textContent = `${(data.cpuUsage || 0).toFixed(1)}%`;
+  $("#bench-live-gpu").textContent = `${(data.gpuUsage || 0).toFixed(1)}%`;
+  $("#bench-live-ram").textContent = `${(data.ramUsedMb || 0).toFixed(0)} MB`;
+
+  if (data.cpuTemp !== undefined && data.cpuTemp !== null) {
+    $("#bench-live-cputemp").textContent = `Temp: ${data.cpuTemp.toFixed(1)}°C`;
+    $("#bench-live-cputemp").style.color = data.cpuTemp > 80 ? "var(--danger)" : "var(--text-secondary)";
+  } else {
+    $("#bench-live-cputemp").textContent = "Temp CPU: Indisponível";
+  }
+
+  if (data.gpuTemp !== undefined && data.gpuTemp !== null) {
+    $("#bench-live-gputemp").textContent = `Temp: ${data.gpuTemp.toFixed(1)}°C`;
+    $("#bench-live-gputemp").style.color = data.gpuTemp > 80 ? "var(--danger)" : "var(--text-secondary)";
+  } else {
+    $("#bench-live-gputemp").textContent = "Temp GPU: Indisponível";
+  }
+}
+
 async function aplicarPerfilUso(key) {
   const p = (listaPerfisUso || []).find((x) => x.key === key);
   if (!p) return;
 
-  const html = `
+  // 1. Iniciar Benchmark Base Pré-Aplicação (60 segundos)
+  abrirModalBenchmark(
+    `Benchmark Base Obrigatório (60s) — ${p.nome}`,
+    "Executando amostragem observacional de 60 segundos do uso de CPU, GPU, memória e sensores de temperatura antes de aplicar as otimizações. Esta medição é 100% não destrutiva."
+  );
+
+  Visualizer.show();
+  Visualizer.log({ type: "read", msg: `Iniciando benchmark-base observacional (60s) para o perfil ${key.toUpperCase()}...` });
+
+  let reportAntes = null;
+  try {
+    reportAntes = await App.IniciarBenchmarkBase(key, 60);
+  } catch (err) {
+    fecharModalBenchmark();
+    toast(`Benchmark cancelado ou interrompido.`, "aviso");
+    return;
+  }
+
+  benchmarkEmAndamento = false;
+  $("#overlay-benchmark").hidden = true;
+
+  if (!reportAntes || reportAntes.sampleCount === 0) {
+    toast("Amostragem de benchmark não concluída.", "aviso");
+    return;
+  }
+
+  // 2. Modal de Confirmação com Métricas da Linha de Base
+  const cpuTempTexto = reportAntes.cpuTempAvailable && reportAntes.cpuTempAvg !== null && reportAntes.cpuTempAvg !== undefined
+    ? `${reportAntes.cpuTempAvg.toFixed(1)}°C (Pico: ${reportAntes.cpuTempPeak ? reportAntes.cpuTempPeak.toFixed(1) : ''}°C)`
+    : `<span class="muted">Sensor não disponível neste hardware</span>`;
+
+  const gpuTempTexto = reportAntes.gpuTempAvailable && reportAntes.gpuTempAvg !== null && reportAntes.gpuTempAvg !== undefined
+    ? `${reportAntes.gpuTempAvg.toFixed(1)}°C (Pico: ${reportAntes.gpuTempPeak ? reportAntes.gpuTempPeak.toFixed(1) : ''}°C)`
+    : `<span class="muted">Sensor não disponível neste hardware</span>`;
+
+  const confirmHtml = `
     <div style="margin-bottom:14px;">
-      <p style="font-size:14px; color:var(--text-primary); margin-bottom:8px;">Deseja aplicar o perfil <b>${esc(p.nome)}</b>?</p>
-      <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">Esta ação será registrada em lote de transação no histórico com backup completo do estado anterior.</p>
+      <p style="font-size:14px; color:var(--text-primary); margin-bottom:6px;">Deseja confirmar e aplicar o perfil <b>${esc(p.nome)}</b>?</p>
+      <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">Linha de base coletada com sucesso (${reportAntes.sampleCount} amostras). O perfil será gravado com snapshot atômico no histórico.</p>
+
+      <div class="glass-card" style="margin-bottom:14px; padding:12px; background:var(--bg-sunken); border-left:3px solid var(--accent);">
+        <h4 style="font-size:12px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Métricas da Linha de Base (Pré-Aplicação):</h4>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
+          <div>• CPU Média/Pico: <b>${reportAntes.cpuUsageAvg.toFixed(1)}% / ${reportAntes.cpuUsagePeak.toFixed(1)}%</b></div>
+          <div>• RAM em Uso: <b>${reportAntes.ramUsedAvgMb.toFixed(0)} MB</b></div>
+          <div>• GPU Média: <b>${reportAntes.gpuUsageAvg.toFixed(1)}%</b></div>
+          <div>• Temp CPU: <b>${cpuTempTexto}</b></div>
+          <div>• Temp GPU: <b>${gpuTempTexto}</b></div>
+          <div>• Throttling Térmico: <b>${reportAntes.thermalThrottled ? '<span style="color:var(--danger)">Detectado</span>' : '<span style="color:var(--accent)">Normal</span>'}</b></div>
+        </div>
+      </div>
+
       <div class="profile-caveat" style="margin-bottom:16px;">
         <strong>Aviso:</strong> ${esc(p.ressalvas)}
       </div>
+
       <div style="display:flex; justify-content:flex-end; gap:8px;">
         <button class="btn-secondary" id="btn-modal-cancelar">Cancelar</button>
-        <button class="btn-primary" id="btn-modal-confirmar-aplicar">Confirmar e Aplicar</button>
+        <button class="btn-primary" id="btn-modal-confirmar-aplicar">Confirmar e Aplicar Perfil</button>
       </div>
     </div>
   `;
-  abrirModal(`Confirmar Aplicação de Perfil`, html);
+  abrirModal(`Confirmar Aplicação: ${p.nome}`, confirmHtml);
 
   $("#btn-modal-cancelar").addEventListener("click", fecharModal);
   $("#btn-modal-confirmar-aplicar").addEventListener("click", async () => {
     fecharModal();
+
+    // 3. Aplicação do Perfil
     Visualizer.show();
-    Visualizer.log({ type: "write", msg: `Iniciando transação do perfil [${key.toUpperCase()}] com snapshot prévio...` });
+    Visualizer.log({ type: "write", msg: `Aplicando configurações do perfil [${key.toUpperCase()}] com snapshot transacional...` });
 
     toast(`Aplicando perfil ${p.nome}…`, "info");
-    const res = await App.AplicarPerfilUso(key, false);
+    const resAplicacao = await App.AplicarPerfilComBenchmark(key, false, reportAntes);
 
-    for (const r of (res || [])) {
+    for (const r of (resAplicacao.resultados || [])) {
       Visualizer.log({
         type: r.estado === "ok" ? "write" : (r.estado === "pulado" ? "read" : "fail"),
         msg: `[${r.estado.toUpperCase()}] ${r.nome}: ${r.mensagem}`
       });
     }
 
-    toast(`Perfil ${p.nome} aplicado com sucesso!`, "ok");
+    // 4. Estabilização e Benchmark Pós-Aplicação (60s)
+    abrirModalBenchmark(
+      `Estabilização & Benchmark Pós-Aplicação (60s) — ${p.nome}`,
+      "O perfil foi aplicado com sucesso. Agora realizando a medição pós-aplicação de 60 segundos para gerar o relatório comparativo de telemetria."
+    );
+
+    Visualizer.log({ type: "read", msg: `Iniciando benchmark observacional pós-aplicação (60s)...` });
+
+    let comparacao = null;
+    try {
+      comparacao = await App.IniciarBenchmarkPos(key, resAplicacao.batchId, 60);
+    } catch (e) {
+      fecharModalBenchmark();
+      toast("Medição pós-aplicação interrompida.", "aviso");
+      await carregarEstadoPerfis();
+      await diagnosticar();
+      return;
+    }
+
+    benchmarkEmAndamento = false;
+    $("#overlay-benchmark").hidden = true;
+
+    // 5. Exibir Comparativo Antes vs Depois
+    exibirRelatorioComparativo(comparacao, p.nome);
     await carregarEstadoPerfis();
     await diagnosticar();
   });
+}
+
+function exibirRelatorioComparativo(comp, perfilNome) {
+  if (!comp) return;
+
+  const b = comp.before;
+  const a = comp.after;
+
+  const formatDelta = (val, unidade = "%") => {
+    if (val === undefined || val === null) return "—";
+    const sinal = val > 0 ? `+${val.toFixed(1)}` : val.toFixed(1);
+    const cor = val < 0 ? "var(--accent)" : (val > 0 ? "var(--warn)" : "var(--text-secondary)");
+    return `<span style="color:${cor}; font-weight:700;">${sinal}${unidade}</span>`;
+  };
+
+  const compHtml = `
+    <div style="margin-bottom:14px;">
+      <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">
+        Comparação observacional de telemetria antes e depois da aplicação do perfil <b>${esc(perfilNome)}</b>:
+      </p>
+
+      <div class="data-table-wrap" style="margin-bottom:14px;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Métrica de Hardware</th>
+              <th>Antes (Base)</th>
+              <th>Depois (Ativo)</th>
+              <th>Variação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Uso Médio de CPU</b></td>
+              <td class="mono">${b.cpuUsageAvg.toFixed(1)}% (Pico: ${b.cpuUsagePeak.toFixed(1)}%)</td>
+              <td class="mono">${a.cpuUsageAvg.toFixed(1)}% (Pico: ${a.cpuUsagePeak.toFixed(1)}%)</td>
+              <td class="mono">${formatDelta(comp.deltaCpuUsageAvg, "%")}</td>
+            </tr>
+            <tr>
+              <td><b>Memória RAM em Uso</b></td>
+              <td class="mono">${b.ramUsedAvgMb.toFixed(0)} MB</td>
+              <td class="mono">${a.ramUsedAvgMb.toFixed(0)} MB</td>
+              <td class="mono">${formatDelta(comp.deltaGpuMemoryAvgMb, " MB")}</td>
+            </tr>
+            <tr>
+              <td><b>Uso Médio de GPU</b></td>
+              <td class="mono">${b.gpuUsageAvg.toFixed(1)}%</td>
+              <td class="mono">${a.gpuUsageAvg.toFixed(1)}%</td>
+              <td class="mono">${formatDelta(comp.deltaGpuUsageAvg, "%")}</td>
+            </tr>
+            <tr>
+              <td><b>Temperatura CPU</b></td>
+              <td class="mono">${b.cpuTempAvailable && b.cpuTempAvg !== null && b.cpuTempAvg !== undefined ? `${b.cpuTempAvg.toFixed(1)}°C` : '<span class="muted">Indisponível</span>'}</td>
+              <td class="mono">${a.cpuTempAvailable && a.cpuTempAvg !== null && a.cpuTempAvg !== undefined ? `${a.cpuTempAvg.toFixed(1)}°C` : '<span class="muted">Indisponível</span>'}</td>
+              <td class="mono">${comp.deltaCpuTempAvg !== null && comp.deltaCpuTempAvg !== undefined ? formatDelta(comp.deltaCpuTempAvg, "°C") : '<span class="muted">—</span>'}</td>
+            </tr>
+            <tr>
+              <td><b>Throttling Térmico</b></td>
+              <td class="mono">${b.thermalThrottled ? '<span style="color:var(--danger)">Ativo</span>' : 'Não'}</td>
+              <td class="mono">${a.thermalThrottled ? '<span style="color:var(--danger)">Ativo</span>' : 'Não'}</td>
+              <td class="mono">${comp.throttlingResolved ? '<span style="color:var(--accent); font-weight:bold;">Resolvido</span>' : '—'}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="field-hint" style="margin-bottom:14px; font-size:12px;">
+        ℹ️ ${esc(comp.disclaimer)}
+      </div>
+
+      <div style="display:flex; justify-content:flex-end;">
+        <button class="btn-primary" onclick="fecharModal()">Concluir</button>
+      </div>
+    </div>
+  `;
+
+  abrirModal(`Comparativo de Telemetria — ${perfilNome}`, compHtml);
 }
 
 async function restaurarPerfilUso(key) {

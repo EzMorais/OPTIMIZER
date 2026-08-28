@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"optimizer/internal/telemetry"
 	"optimizer/internal/tweak"
 )
 
@@ -50,6 +51,10 @@ type Entry struct {
 	BatchID string `json:"batchId,omitempty"`
 	// Origin identifica se a ação foi manual ou por perfil (ex: "perfil-jogo", "perfil-coding").
 	Origin string `json:"origin,omitempty"`
+	// BenchmarkBefore armazena o benchmark observacional de 60s pré-aplicação.
+	BenchmarkBefore *telemetry.BenchmarkReport `json:"benchmarkBefore,omitempty"`
+	// BenchmarkAfter armazena o benchmark observacional de 60s pós-aplicação.
+	BenchmarkAfter *telemetry.BenchmarkReport `json:"benchmarkAfter,omitempty"`
 }
 
 // Store é o histórico em disco.
@@ -216,3 +221,42 @@ func (s *Store) ActiveBatchForOrigin(origin string) (string, []Entry, error) {
 	}
 	return lastBatchID, out, nil
 }
+
+// SaveBenchmarkRecord registra uma entrada de benchmark no histórico associada a um lote.
+func (s *Store) SaveBenchmarkRecord(origin string, batchID string, before *telemetry.BenchmarkReport, after *telemetry.BenchmarkReport) (Entry, error) {
+	entry := Entry{
+		ID:              newID(),
+		TweakID:         "telemetria.benchmark",
+		Action:          ActionApply,
+		At:              time.Now(),
+		Success:         true,
+		BatchID:         batchID,
+		Origin:          origin,
+		Detail:          "Benchmark observacional de telemetria de CPU/GPU",
+		BenchmarkBefore: before,
+		BenchmarkAfter:  after,
+	}
+	return s.Append(entry)
+}
+
+// GetBatchBenchmark busca os benchmarks associados a um lote.
+func (s *Store) GetBatchBenchmark(batchID string) (*telemetry.BenchmarkReport, *telemetry.BenchmarkReport, error) {
+	entries, err := s.All()
+	if err != nil {
+		return nil, nil, err
+	}
+	var before *telemetry.BenchmarkReport
+	var after *telemetry.BenchmarkReport
+	for _, e := range entries {
+		if e.BatchID == batchID {
+			if e.BenchmarkBefore != nil {
+				before = e.BenchmarkBefore
+			}
+			if e.BenchmarkAfter != nil {
+				after = e.BenchmarkAfter
+			}
+		}
+	}
+	return before, after, nil
+}
+

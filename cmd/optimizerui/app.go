@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"os/exec"
 	"sort"
+	"sync"
 	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"optimizer/internal/cpudiag"
 	"optimizer/internal/diskdiag"
@@ -16,6 +19,7 @@ import (
 	"optimizer/internal/profiles"
 	"optimizer/internal/restore"
 	"optimizer/internal/systemdiag"
+	"optimizer/internal/telemetry"
 	"optimizer/internal/tweak"
 	"optimizer/internal/tweaks"
 	"optimizer/internal/winreg"
@@ -29,6 +33,12 @@ type App struct {
 
 	// última medição de rede, para o botão "aplicar ajuste" saber o que aplicar
 	ultimoMTU *medicaoMTU
+
+	// Sessão de telemetria e benchmark
+	benchMu           sync.Mutex
+	benchCancel       context.CancelFunc
+	benchCollector    *telemetry.Collector
+	ultimoReportAntes map[string]telemetry.BenchmarkReport
 }
 
 type medicaoMTU struct {
@@ -58,6 +68,9 @@ func (a *App) startup(ctx context.Context) {
 		History:  store,
 		Elevated: elevate.IsElevated(),
 	}
+
+	a.benchCollector = telemetry.NewCollector(telemetry.NewWindowsLiveProvider())
+	a.ultimoReportAntes = make(map[string]telemetry.BenchmarkReport)
 }
 
 // ---------------------------------------------------------------- tipos da UI
@@ -830,3 +843,231 @@ func (a *App) ObterMetricasCPU() cpudiag.CPUInfo {
 	}
 	return info
 }
+
+// ---------------------------------------------------------------- Telemetria & Benchmark Obrigatório de Perfil
+
+type BenchmarkProgressUI struct {
+	Stage            string   `json:"stage"`
+	Current          int      `json:"current"`
+	Total            int      `json:"total"`
+	Percent          float64  `json:"percent"`
+	CPUUsage         float64  `json:"cpuUsage"`
+	CPUTemp          *float64 `json:"cpuTemp,omitempty"`
+	GPUUsage         float64  `json:"gpuUsage"`
+	GPUTemp          *float64 `json:"gpuTemp,omitempty"`
+	RAMUsedMB        float64  `json:"ramUsedMb"`
+	ThermalThrottled bool     `json:"thermalThrottled"`
+}
+
+type ResultadoAplicacaoPerfil struct {
+	BatchID     string                     `json:"batchId"`
+	Resultados  []ResultadoUI              `json:"resultados"`
+	ReportAntes telemetry.BenchmarkReport `json:"reportAntes"`
+}
+
+func (a *App) emitEvent(name string, data ...any) {
+	if a.ctx == nil || a.ctx.Value("frontend") == nil {
+		return
+	}
+	defer func() {
+		_ = recover()
+	}()
+	runtime.EventsEmit(a.ctx, name, data...)
+}
+
+// IniciarBenchmarkBase executa o benchmark observacional de 60s antes de aplicar o perfil.
+func (a *App) IniciarBenchmarkBase(perfilKey string, segundos int) (telemetry.BenchmarkReport, error) {
+	if segundos <= 0 {
+		segundos = 60
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(segundos+15)*time.Second)
+	a.benchMu.Lock()
+	a.benchCancel = cancel
+	collector := a.benchCollector
+	if collector == nil {
+		collector = telemetry.NewCollector(telemetry.NewWindowsLiveProvider())
+		a.benchCollector = collector
+	}
+	a.benchMu.Unlock()
+
+	defer func() {
+		a.benchMu.Lock()
+		a.benchCancel = nil
+		a.benchMu.Unlock()
+	}()
+
+	report, err := collector.RunBenchmark(ctx, "before", time.Duration(segundos)*time.Second, 1*time.Second, func(curr, total int, last telemetry.MetricSample) {
+		pct := float64(curr) / float64(total) * 100.0
+		progress := BenchmarkProgressUI{
+			Stage:            "before",
+			Current:          curr,
+			Total:            total,
+			Percent:          pct,
+			CPUUsage:         last.CPUUsagePercent,
+			CPUTemp:          last.CPUTempCelsius,
+			GPUUsage:         last.GPUUsagePercent,
+			GPUTemp:          last.GPUTempCelsius,
+			RAMUsedMB:        last.RAMUsedMB,
+			ThermalThrottled: last.ThermalThrottling,
+		}
+		a.emitEvent("benchmark:progress", progress)
+	})
+
+	if err == nil {
+		a.benchMu.Lock()
+		if a.ultimoReportAntes == nil {
+			a.ultimoReportAntes = make(map[string]telemetry.BenchmarkReport)
+		}
+		a.ultimoReportAntes[perfilKey] = report
+		a.benchMu.Unlock()
+	}
+
+	return report, err
+}
+
+// CancelarBenchmark interrompe imediatamente a coleta de telemetria em andamento.
+func (a *App) CancelarBenchmark() {
+	a.benchMu.Lock()
+	defer a.benchMu.Unlock()
+	if a.benchCancel != nil {
+		a.benchCancel()
+		a.benchCancel = nil
+	}
+}
+
+// AplicarPerfilComBenchmark aplica o perfil registrando o benchmark prévio e gerando o lote.
+func (a *App) AplicarPerfilComBenchmark(key string, dryRun bool, reportAntes telemetry.BenchmarkReport) ResultadoAplicacaoPerfil {
+	p, ok := profiles.ObterPerfilUso(key)
+	if !ok {
+		return ResultadoAplicacaoPerfil{
+			Resultados: []ResultadoUI{{Nome: key, Estado: "falhou", Mensagem: "Perfil de uso desconhecido"}},
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	ativo := a.ObterPerfilAtivo()
+	if ativo != "" && ativo != key && !dryRun {
+		batchID, _, _ := a.eng.History.ActiveBatchForOrigin("perfil-" + ativo)
+		if batchID != "" {
+			_ = a.eng.RevertBatch(ctx, batchID, false)
+		}
+	}
+
+	batchID := fmt.Sprintf("batch-%s-%d", key, time.Now().Unix())
+	origin := "perfil-" + key
+	rawResults := a.eng.ApplyBatch(ctx, p.TweakIDs, dryRun, origin, batchID)
+
+	if !dryRun {
+		if p.PowerPlanGUID != "" {
+			_ = systemdiag.AtivarPlanoEnergia(ctx, p.PowerPlanGUID)
+		}
+		if p.DisableSleepAC {
+			_ = exec.CommandContext(ctx, "powercfg", "/change", "standby-timeout-ac", "0").Run()
+		}
+		for _, s := range p.ServicesToPause {
+			_ = exec.CommandContext(ctx, "net", "stop", s, "/y").Run()
+		}
+		for _, s := range p.ServicesToEnsure {
+			_ = exec.CommandContext(ctx, "net", "start", s).Run()
+		}
+
+		// Registra o relatório prévio no histórico junto ao lote
+		if a.eng.History != nil {
+			_, _ = a.eng.History.SaveBenchmarkRecord(origin, batchID, &reportAntes, nil)
+		}
+	}
+
+	var results []ResultadoUI
+	for _, r := range rawResults {
+		estado := "ok"
+		if r.Skipped {
+			estado = "pulado"
+		} else if r.Err != nil {
+			estado = "falhou"
+		}
+		msg := r.Detail
+		if r.Reason != "" {
+			msg = r.Reason
+		}
+		if r.Err != nil {
+			msg = r.Err.Error()
+		}
+		results = append(results, ResultadoUI{
+			ID:          r.ID,
+			Nome:        r.Name,
+			Estado:      estado,
+			Mensagem:    msg,
+			PrecisaSair: r.RestartNeeded,
+		})
+	}
+
+	return ResultadoAplicacaoPerfil{
+		BatchID:     batchID,
+		Resultados:  results,
+		ReportAntes: reportAntes,
+	}
+}
+
+// IniciarBenchmarkPos executa a coleta pós-aplicação e devolve o comparativo completo.
+func (a *App) IniciarBenchmarkPos(perfilKey string, batchID string, segundos int) (telemetry.BenchmarkComparison, error) {
+	if segundos <= 0 {
+		segundos = 60
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(segundos+15)*time.Second)
+	a.benchMu.Lock()
+	a.benchCancel = cancel
+	collector := a.benchCollector
+	if collector == nil {
+		collector = telemetry.NewCollector(telemetry.NewWindowsLiveProvider())
+		a.benchCollector = collector
+	}
+	a.benchMu.Unlock()
+
+	defer func() {
+		a.benchMu.Lock()
+		a.benchCancel = nil
+		a.benchMu.Unlock()
+	}()
+
+	reportPos, err := collector.RunBenchmark(ctx, "after", time.Duration(segundos)*time.Second, 1*time.Second, func(curr, total int, last telemetry.MetricSample) {
+		pct := float64(curr) / float64(total) * 100.0
+		progress := BenchmarkProgressUI{
+			Stage:            "after",
+			Current:          curr,
+			Total:            total,
+			Percent:          pct,
+			CPUUsage:         last.CPUUsagePercent,
+			CPUTemp:          last.CPUTempCelsius,
+			GPUUsage:         last.GPUUsagePercent,
+			GPUTemp:          last.GPUTempCelsius,
+			RAMUsedMB:        last.RAMUsedMB,
+			ThermalThrottled: last.ThermalThrottling,
+		}
+		a.emitEvent("benchmark:progress", progress)
+	})
+
+	a.benchMu.Lock()
+	reportAntes := a.ultimoReportAntes[perfilKey]
+	a.benchMu.Unlock()
+
+	// Se não estava em memória, tenta recuperar do histórico
+	if reportAntes.SampleCount == 0 && a.eng.History != nil {
+		bAntes, _, _ := a.eng.History.GetBatchBenchmark(batchID)
+		if bAntes != nil {
+			reportAntes = *bAntes
+		}
+	}
+
+	comp := telemetry.CompareBenchmarks(perfilKey, batchID, reportAntes, reportPos)
+
+	// Atualiza histórico com ambos relatórios
+	if a.eng.History != nil && err == nil {
+		origin := "perfil-" + perfilKey
+		_, _ = a.eng.History.SaveBenchmarkRecord(origin, batchID, &reportAntes, &reportPos)
+	}
+
+	return comp, err
+}
+

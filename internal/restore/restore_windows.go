@@ -105,6 +105,9 @@ func Cancel(sequence uint64) error {
 }
 
 func copyDescription(info *restorePointInfo, s string) {
+	if s == "" {
+		s = "Optimizer"
+	}
 	u, err := windows.UTF16FromString(s)
 	if err != nil {
 		u = windows.StringToUTF16("Optimizer")

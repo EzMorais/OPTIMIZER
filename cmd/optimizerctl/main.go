@@ -623,7 +623,7 @@ func quebrar(s string, largura int) string {
 }
 
 func cmdPerfil(args []string) error {
-	fs := flag.NewFlagSet("perfil", flag.ExitOnError)
+	fs := flag.NewFlagSet("perfil", flag.ContinueOnError)
 	g := addGlobals(fs)
 	fs.Usage = func() {
 		fmt.Fprint(os.Stderr, `Uso: optimizerctl perfil <subcomando>
@@ -636,7 +636,6 @@ Exemplos:
   optimizerctl perfil listar
   optimizerctl perfil aplicar network-fast --simular
 `)
-		os.Exit(1)
 	}
 	soltos, err := parseArgs(fs, g, args)
 	if err != nil {
@@ -644,8 +643,7 @@ Exemplos:
 	}
 
 	if len(soltos) == 0 {
-		fs.Usage()
-		return nil
+		return cmdPerfilListar()
 	}
 
 	subcmd := soltos[0]
@@ -709,7 +707,7 @@ func cmdPerfilAplicar(g *globals, profileKey string) error {
 }
 
 func cmdRede(args []string) error {
-	fs := flag.NewFlagSet("rede", flag.ExitOnError)
+	fs := flag.NewFlagSet("rede", flag.ContinueOnError)
 	g := addGlobals(fs)
 	destino := fs.String("destino", "8.8.8.8", "host para medir")
 	fs.Usage = func() {
@@ -726,7 +724,6 @@ Exemplos:
   optimizerctl rede medir
   optimizerctl rede medir --destino 1.1.1.1
 `)
-		os.Exit(1)
 	}
 	soltos, err := parseArgs(fs, g, args)
 	if err != nil {

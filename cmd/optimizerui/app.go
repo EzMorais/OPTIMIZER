@@ -183,6 +183,7 @@ func (a *App) Aplicar(ids []string, simular bool, pontoDeRestauracao bool) []Res
 		return nil
 	}
 	var seq uint64
+	var anyApplied bool
 	if pontoDeRestauracao && !simular {
 		a.eng.CreateRestorePoint = func(desc string) (uint64, error) {
 			s, err := restore.Begin(desc)
@@ -192,13 +193,24 @@ func (a *App) Aplicar(ids []string, simular bool, pontoDeRestauracao bool) []Res
 		defer func() {
 			a.eng.CreateRestorePoint = nil
 			if seq != 0 {
-				_ = restore.End(seq)
+				if anyApplied {
+					_ = restore.End(seq)
+				} else {
+					_ = restore.Cancel(seq)
+				}
 			}
 		}()
 	} else {
 		a.eng.CreateRestorePoint = nil
 	}
-	return traduzir(a.eng.Apply(a.ctx, ids, simular))
+	rawResults := a.eng.Apply(a.ctx, ids, simular)
+	for _, r := range rawResults {
+		if r.Applied {
+			anyApplied = true
+			break
+		}
+	}
+	return traduzir(rawResults)
 }
 
 // Desfazer volta os itens ao estado anterior gravado no histórico.
@@ -442,15 +454,16 @@ func (a *App) AplicarPerfilRede(profileKey string, dryRun bool) []ResultadoUI {
 // ------------------------------------------------------------------ Medição de Rede
 
 type BenchmarkUI struct {
-	Timestamp      string  `json:"timestamp"`
-	Host           string  `json:"host"`
-	MinRTT         int     `json:"minRTT"`
-	AvgRTT         int     `json:"avgRTT"`
-	MaxRTT         int     `json:"maxRTT"`
-	StdDev         int     `json:"stdDev"`
-	PacketsSent    int     `json:"packetsSent"`
-	PacketsLost    int     `json:"packetsLost"`
-	LossPercent    float64 `json:"lossPercent"`
+	Timestamp   string  `json:"timestamp"`
+	Host        string  `json:"host"`
+	MinRTT      int     `json:"minRTT"`
+	AvgRTT      int     `json:"avgRTT"`
+	MaxRTT      int     `json:"maxRTT"`
+	StdDev      int     `json:"stdDev"`
+	PacketsSent int     `json:"packetsSent"`
+	PacketsLost int     `json:"packetsLost"`
+	LossPercent float64 `json:"lossPercent"`
+	Erro        string  `json:"erro,omitempty"`
 }
 
 type ComparativoUI struct {
@@ -462,13 +475,16 @@ type ComparativoUI struct {
 }
 
 // medirRede é a implementação comum de Antes/Depois — só muda o rótulo do momento.
-func (a *App) medirRede(host string) (BenchmarkUI, error) {
+// Segue o mesmo padrão de MedirMTU: nunca devolve um error Go cru para o
+// frontend (isso vira uma promise rejeitada não tratada no JS); o erro vem
+// embutido no campo Erro da própria struct.
+func (a *App) medirRede(host string) BenchmarkUI {
 	if host == "" {
 		host = "8.8.8.8"
 	}
 	report, err := netdiag.MeasureLatency(a.ctx, host, 20)
 	if err != nil {
-		return BenchmarkUI{}, err
+		return BenchmarkUI{Host: host, Erro: err.Error()}
 	}
 	lossPercent := 0.0
 	if report.PacketsSent > 0 {
@@ -484,16 +500,16 @@ func (a *App) medirRede(host string) (BenchmarkUI, error) {
 		PacketsSent: report.PacketsSent,
 		PacketsLost: report.PacketsLost,
 		LossPercent: lossPercent,
-	}, nil
+	}
 }
 
 // MedirRedeAntes executa um benchmark antes de aplicar um ajuste.
-func (a *App) MedirRedeAntes(host string) (BenchmarkUI, error) {
+func (a *App) MedirRedeAntes(host string) BenchmarkUI {
 	return a.medirRede(host)
 }
 
 // MedirRedeDepois executa um benchmark depois de aplicar um ajuste.
-func (a *App) MedirRedeDepois(host string) (BenchmarkUI, error) {
+func (a *App) MedirRedeDepois(host string) BenchmarkUI {
 	return a.medirRede(host)
 }
 

@@ -57,9 +57,14 @@ const (
 	pathExplorerAdv   = `Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced`
 	pathGameConfig    = `System\GameConfigStore`
 	pathMMCSS         = `SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`
-	pathDeliveryOpt   = `SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization`
-	pathGameDVRPolicy = `SOFTWARE\Policies\Microsoft\Windows\GameDVR`
-	pathTcpip         = `SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`
+	pathDeliveryOpt     = `SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization`
+	pathGameDVRPolicy   = `SOFTWARE\Policies\Microsoft\Windows\GameDVR`
+	pathTcpip           = `SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`
+	pathGraphicsDrivers = `SYSTEM\CurrentControlSet\Control\GraphicsDrivers`
+	pathGameBar         = `Software\Microsoft\GameBar`
+	pathFileSystem      = `SYSTEM\CurrentControlSet\Control\FileSystem`
+	pathSearchPolicy    = `SOFTWARE\Policies\Microsoft\Windows\Windows Search`
+	pathExplorerPolicy  = `Software\Policies\Microsoft\Windows\Explorer`
 )
 
 func entries() []entry {
@@ -89,6 +94,29 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
+				TweakID:     "armazenamento.trim-ntfs",
+				DisplayName: "Ativar TRIM para SSDs (manutenção de velocidade e vida útil)",
+				Explanation: "Garante que o comando TRIM esteja habilitado no sistema de arquivos, informando ao SSD quais blocos de dados não estão mais em uso para manter alta velocidade de gravação contínua.",
+				Cat:            tweak.CategoryStorage,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O TRIM está ativado para SSDs.",
+				NotAppliedText: "O TRIM está desativado no sistema de arquivos.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathFileSystem, "DisableDeleteNotify", 0, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "O padrão de fábrica do Windows é ativado (0). Se algum software desativou (1), este ajuste restaura a saúde e desempenho do seu SSD sem nenhum risco.",
+				Evidence:           "docs/catalogo/hardware-energia-gpu.md#7-trim-e-otimizar-unidades",
+				SortOrder:          15,
+			},
+		},
+		{
+			spec: regtweak.Spec{
 				TweakID:     "jogos.gamedvr-usuario",
 				DisplayName: "Desligar a gravação de jogos em segundo plano",
 				Explanation: "O Windows mantém um gravador de jogos rodando por trás mesmo quando você não está gravando nada. " +
@@ -112,6 +140,51 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
+				TweakID:     "jogos.game-mode",
+				DisplayName: "Modo de Jogo do Windows",
+				Explanation: "Garante que o Modo de Jogo esteja ativo para priorizar recursos de CPU e suprimir notificações e tarefas pesadas de fundo durante os jogos.",
+				Cat:            tweak.CategoryGaming,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O Modo de Jogo está ativado.",
+				NotAppliedText: "O Modo de Jogo está desativado.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKCU, pathGameBar, "AutoGameModeEnabled", 1, 1),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfileBoth,
+				Caveat:             "O Windows já ativa o Modo de Jogo de fábrica na maioria das instalações. Este ajuste assegura que ele não foi desativado acidentalmente por outros otimizadores.",
+				Evidence:           "docs/catalogo/hardware-energia-gpu.md#6-modo-de-jogo-game-mode",
+				SortOrder:          22,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "visual.hags",
+				DisplayName: "Agendamento de GPU acelerado por hardware (HAGS)",
+				Explanation: "Permite que a placa de vídeo gerencie sua própria memória de vídeo diretamente, reduzindo latência em jogos e habilitando tecnologias como DLSS Frame Generation.",
+				Cat:            tweak.CategoryVisualEffects,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "O agendamento de GPU acelerado por hardware está ativado.",
+				NotAppliedText: "O agendamento de GPU acelerado por hardware não está forçado como ativo.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathGraphicsDrivers, "HwSchMode", 2, 2),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Em placas modernas (RTX 40-series+), é pré-requisito para Frame Generation. Em softwares de edição profissional (ex: Premiere/CUDA), o ganho é variável. Exige reiniciar o PC para surtir efeito.",
+				Evidence:           "docs/catalogo/hardware-energia-gpu.md#5-hardware-accelerated-gpu-scheduling-hags",
+				SortOrder:          25,
+			},
+		},
+		{
+			spec: regtweak.Spec{
 				TweakID:     "visual.transparency-effects",
 				DisplayName: "Efeitos de transparência",
 				Explanation: "Desliga o efeito de vidro fosco da barra de tarefas e dos menus.",
@@ -130,6 +203,30 @@ func entries() []entry {
 				Caveat:             "Em qualquer PC comprado nos últimos 8 a 10 anos, o ganho de velocidade é praticamente zero — a diferença aparece em máquina antiga, com vídeo integrado fraco. Deixamos disponível por gosto pessoal, não como promessa de desempenho.",
 				Evidence:           "docs/catalogo/registro.md#animações--4-chaves-independentes-toggles-separáveis",
 				SortOrder:          30,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "sistema.search-sem-bing",
+				DisplayName: "Pesquisa do Menu Iniciar sem resultados da web (Bing)",
+				Explanation: "Faz a pesquisa do Menu Iniciar buscar somente programas e arquivos locais no computador, sem gastar conexão nem exibir sugestões e notícias da web.",
+				Cat:            tweak.CategorySystem,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "A pesquisa do Menu Iniciar está restrita a arquivos locais.",
+				NotAppliedText: "A pesquisa do Menu Iniciar pode incluir resultados e sugestões da web.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathSearchPolicy, "DisableWebSearch", 1, 0),
+				regtweak.DWord(winreg.HKLM, pathSearchPolicy, "ConnectedSearchUseWeb", 0, 1),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Acelera a resposta da busca do Menu Iniciar e protege sua privacidade ao não enviar o que você digita para a internet. Se você costuma pesquisar na web direto pelo Menu Iniciar, mantenha como está.",
+				Evidence:           "docs/catalogo/registro.md#indexação-e-busca-windows-search",
+				SortOrder:          35,
 			},
 		},
 		{
@@ -223,6 +320,28 @@ func entries() []entry {
 				Caveat:             "Vale a pena em internet com franquia limitada, 4G/5G ou conexão compartilhada. Em banda larga folgada, a diferença no dia a dia é pequena — e desligar faz cada PC da casa baixar a mesma atualização de novo.",
 				Evidence:           "docs/catalogo/rede.md#10-delivery-optimization",
 				SortOrder:          70,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "rede.thumbs-rede-off",
+				DisplayName: "Não criar arquivos thumbs.db em pastas de rede",
+				Explanation: "Impede o Windows de criar e travar arquivos ocultos de miniaturas em compartilhamentos de rede, facilitando operações de renomear e excluir pastas remotas.",
+				Cat:            tweak.CategoryNetwork,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "A criação de thumbs.db em rede está desativada.",
+				NotAppliedText: "O Windows pode criar thumbs.db em pastas de rede.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKCU, pathExplorerPolicy, "DisableThumbsDBOnNetworkFolders", 1, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfileWork,
+				Caveat:             "Recomendado especialmente em ambientes corporativos e de trabalho com pastas em rede (NAS/compartilhamentos). Não afeta o cache de miniaturas em discos locais.",
+				Evidence:           "docs/catalogo/registro.md#cache-de-miniaturas",
+				SortOrder:          75,
 			},
 		},
 		{

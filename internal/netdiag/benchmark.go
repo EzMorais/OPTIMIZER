@@ -96,15 +96,19 @@ func MeasureLatencyFromRTTs(host string, rtts []int, packetsSent int) (LatencyRe
 // MakeBenchmark cria um snapshot de benchmark no momento presente,
 // usando latência medida e opcionalmente performance counters.
 func MakeBenchmark(ctx context.Context, latency LatencyReport, host string) Benchmark {
+	var loss float64
+	if latency.PacketsSent > 0 {
+		loss = float64(latency.PacketsLost) / float64(latency.PacketsSent) * 100
+	}
 	return Benchmark{
-		Timestamp:   time.Now(),
-		Host:        host,
-		Latency:     latency,
-		Jitter:      latency.StdDev,
-		Loss:        float64(latency.PacketsLost) / float64(latency.PacketsSent) * 100,
-		CPUUsage:    0, // TODO: coletar via WMI Win32_PerfFormattedData_PerfOS_Processor
-		NetworkBW:   0, // TODO: coletar via WMI Win32_PerfFormattedData_Tcpip_NetworkInterface
-		TCPErrors:   0, // TODO: coletar via WMI Win32_PerfFormattedData_Tcpip_TCPv4
+		Timestamp: time.Now(),
+		Host:      host,
+		Latency:   latency,
+		Jitter:    latency.StdDev,
+		Loss:      loss,
+		CPUUsage:  0,
+		NetworkBW: 0,
+		TCPErrors: 0,
 	}
 }
 
@@ -137,18 +141,9 @@ func interpretBenchmarkDelta(delta BenchmarkDelta) string {
 	// Se latência piorou significativamente (>10%), avisar.
 	if delta.LatencyDeltaPercent > 10 {
 		return fmt.Sprintf(
-			"A latência aumentou %.1f%% (%d ms). "+
+			"A latência aumentou %.1f%% (+%d ms). "+
 				"O ajuste pode ter piorado a conexão — considere desfazer.",
 			delta.LatencyDeltaPercent, delta.LatencyAbsoluteDelta,
-		)
-	}
-
-	// Se latência melhorou, mas margem < 5%, avisar que é ruído de medição.
-	if delta.LatencyDeltaPercent > 0 && delta.LatencyDeltaPercent < 5 {
-		return fmt.Sprintf(
-			"A latência diminuiu %.1f%% (%d ms), mas esta mudança é pequena demais para ser "+
-				"distinguível do ruído de medição — não há evidência de melhoria real.",
-			-delta.LatencyDeltaPercent, -delta.LatencyAbsoluteDelta,
 		)
 	}
 
@@ -156,25 +151,45 @@ func interpretBenchmarkDelta(delta BenchmarkDelta) string {
 	if delta.LatencyDeltaPercent < -5 {
 		return fmt.Sprintf(
 			"A latência diminuiu %.1f%% (%d ms). Uma melhoria detectada.",
-			-delta.LatencyDeltaPercent, -delta.LatencyAbsoluteDelta,
+			-delta.LatencyDeltaPercent, delta.LatencyAbsoluteDelta,
 		)
 	}
 
-	// Se latência está estável.
-	if delta.LatencyDeltaPercent > -5 && delta.LatencyDeltaPercent < 5 {
-		if delta.LossDeltaPercent < 0 {
-			return fmt.Sprintf(
-				"A latência está estável (%.1f ms). Perda de pacotes diminuiu %.1f%%.",
-				float64(delta.After.Latency.AvgRTT), -delta.LossDeltaPercent,
-			)
-		}
+	// Se latência melhorou, mas margem < 5%, avisar que é ruído de medição.
+	if delta.LatencyDeltaPercent < 0 && delta.LatencyDeltaPercent >= -5 {
 		return fmt.Sprintf(
-			"A latência está estável (%.1f ms). Sem mudança perceptível.",
-			float64(delta.After.Latency.AvgRTT),
+			"A latência diminuiu %.1f%% (%d ms), mas esta mudança é pequena demais para ser "+
+				"distinguível do ruído de medição — não há evidência de melhoria real.",
+			-delta.LatencyDeltaPercent, delta.LatencyAbsoluteDelta,
 		)
 	}
 
-	return "Benchmarks capturados."
+	// Se latência aumentou levemente (0 a 10%), variação normal.
+	if delta.LatencyDeltaPercent > 0 && delta.LatencyDeltaPercent <= 10 {
+		return fmt.Sprintf(
+			"A latência teve uma pequena variação de +%.1f%% (+%d ms), dentro da margem de ruído da rede.",
+			delta.LatencyDeltaPercent, delta.LatencyAbsoluteDelta,
+		)
+	}
+
+	// Se latência está perfeitamente estável (delta == 0).
+	if delta.LossDeltaPercent < 0 {
+		return fmt.Sprintf(
+			"A latência está estável (%.1f ms). Perda de pacotes diminuiu %.1f%%.",
+			float64(delta.After.Latency.AvgRTT), -delta.LossDeltaPercent,
+		)
+	}
+	if delta.LossDeltaPercent > 0 {
+		return fmt.Sprintf(
+			"A latência está estável (%.1f ms), mas a perda de pacotes aumentou %.1f%%.",
+			float64(delta.After.Latency.AvgRTT), delta.LossDeltaPercent,
+		)
+	}
+
+	return fmt.Sprintf(
+		"A latência está estável (%.1f ms). Sem mudança perceptível.",
+		float64(delta.After.Latency.AvgRTT),
+	)
 }
 
 // RTTProber envia um único eco ICMP e devolve o RTT em ms. ok=false é pacote

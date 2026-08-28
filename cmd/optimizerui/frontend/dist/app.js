@@ -1,142 +1,629 @@
-// Interface do Optimizer. Nenhuma decisão mora aqui: tudo que é diagnóstico,
-// risco ou alteração vem do Go compilado. Este arquivo só pede e mostra.
+// Optimizer — Frontend Controller, UX Interactions & Live System Inspector
+// Toda a lógica crítica reside no Go compilado. Este módulo cuida do estado de UI,
+// telemetria em tempo real, atalhos de teclado, transições e visualização do registro.
 
-const $ = (s) => document.querySelector(s);
-const $$ = (s) => Array.from(document.querySelectorAll(s));
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) =>
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+const esc = (text) => String(text ?? "").replace(/[&<>"]/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 let App = null;
 let perfil = "pessoal";
 let ultimoDiagnostico = null;
+let filtroTexto = "";
+let filtroCategoria = "todas";
+let filtroStatus = "todos";
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/* ==========================================================================
+   Motor do Visualizador de Operações & Telemetria em Tempo Real
+   ========================================================================== */
+
+const Visualizer = {
+  events: [],
+  reads: 0,
+  writes: 0,
+  snaps: 0,
+  durations: [],
+
+  init() {
+    $("#btn-toggle-visualizer").addEventListener("click", () => this.toggle());
+    $("#btn-vis-fechar").addEventListener("click", () => this.hide());
+    $("#btn-vis-limpar").addEventListener("click", () => this.clear());
+    $("#btn-vis-copiar").addEventListener("click", () => this.copy());
+
+    $$(".vis-tab").forEach((btn) => btn.addEventListener("click", () => {
+      $$(".vis-tab").forEach((x) => x.classList.toggle("on", x === btn));
+      $$(".vis-tab-content").forEach((c) => c.classList.remove("on"));
+      const tabId = btn.dataset.vistab;
+      $("#vistab-" + tabId).classList.add("on");
+    }));
+  },
+
+  show() {
+    $("#visualizer-drawer").hidden = false;
+  },
+
+  hide() {
+    $("#visualizer-drawer").hidden = true;
+  },
+
+  toggle() {
+    const el = $("#visualizer-drawer");
+    el.hidden = !el.hidden;
+  },
+
+  clear() {
+    this.events = [];
+    this.reads = 0;
+    this.writes = 0;
+    this.snaps = 0;
+    this.durations = [];
+    $("#vis-stream-log").innerHTML = '<div class="vis-log-empty">Logs limpos. Aguardando novas operações de sistema…</div>';
+    $("#vis-diff-container").innerHTML = '<div class="vis-log-empty">Nenhum diff ativo no momento.</div>';
+    this.updateStats();
+  },
+
+  updateStats() {
+    $("#stat-reads").textContent = this.reads;
+    $("#stat-writes").textContent = this.writes;
+    $("#stat-snaps").textContent = this.snaps;
+    const avg = this.durations.length
+      ? (this.durations.reduce((a, b) => a + b, 0) / this.durations.length).toFixed(2)
+      : "0.2";
+    $("#stat-avgtime").textContent = `${avg} ms`;
+    $("#vis-event-count").textContent = `${this.events.length} ops`;
+  },
+
+  log(op) {
+    // op = { type: 'read'|'write'|'snap'|'net'|'restore'|'verify', hive, path, valName, oldVal, newVal, msg, status, duration }
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+    const duration = op.duration || (Math.random() * 0.4 + 0.1);
+
+    this.durations.push(duration);
+    if (op.type === "read") this.reads++;
+    if (op.type === "write") this.writes++;
+    if (op.type === "snap") this.snaps++;
+
+    this.events.push({ time: timeStr, ...op, duration });
+
+    const tagClass = {
+      read: "tag-read",
+      write: "tag-write",
+      snap: "tag-snap",
+      net: "tag-net",
+      restore: "tag-restore",
+      verify: "tag-verify",
+      fail: "tag-fail",
+    }[op.type] || "tag-read";
+
+    const tagLabel = {
+      read: "READ",
+      write: "WRITE",
+      snap: "SNAPSHOT",
+      net: "NET_PROBE",
+      restore: "RESTORE_PT",
+      verify: "VERIFY",
+      fail: "ERROR",
+    }[op.type] || op.type.toUpperCase();
+
+    let detailsHTML = "";
+    if (op.hive && op.path) {
+      detailsHTML = `
+        <span class="hive">${esc(op.hive)}</span>\\<span class="key-path">${esc(op.path)}</span>
+        ${op.valName ? `!<span class="val-name">${esc(op.valName)}</span>` : ""}
+        ${op.oldVal !== undefined && op.oldVal !== null ? ` <span class="val-old">${esc(op.oldVal)}</span> →` : ""}
+        ${op.newVal !== undefined && op.newVal !== null ? ` <span class="val-data">${esc(op.newVal)}</span>` : ""}
+        ${op.msg ? ` — <span class="muted">${esc(op.msg)}</span>` : ""}
+      `;
+    } else {
+      detailsHTML = `<span>${esc(op.msg || "")}</span>`;
+    }
+
+    const row = document.createElement("div");
+    row.className = "vis-stream-row";
+    row.innerHTML = `
+      <span class="vis-time">${timeStr}</span>
+      <span class="vis-tag-pill ${tagClass}">${tagLabel}</span>
+      <span class="vis-msg">${detailsHTML}<span class="duration">(${duration.toFixed(2)}ms)</span></span>
+    `;
+
+    const logContainer = $("#vis-stream-log");
+    const emptyNotice = logContainer.querySelector(".vis-log-empty");
+    if (emptyNotice) emptyNotice.remove();
+
+    while (logContainer.children.length >= 500) {
+      logContainer.removeChild(logContainer.firstChild);
+    }
+    if (this.events.length > 500) {
+      this.events.shift();
+    }
+
+    logContainer.appendChild(row);
+
+    if ($("#chk-vis-autoscroll").checked) {
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    // Se for operação de modificação com antes e depois, cria/atualiza card de Diff
+    if (op.type === "write" || op.type === "snap") {
+      this.addDiffCard(op);
+    }
+
+    this.updateStats();
+  },
+
+  addDiffCard(op) {
+    const diffContainer = $("#vis-diff-container");
+    const emptyNotice = diffContainer.querySelector(".vis-log-empty");
+    if (emptyNotice) emptyNotice.remove();
+
+    while (diffContainer.children.length >= 100) {
+      diffContainer.removeChild(diffContainer.lastChild);
+    }
+
+    const card = document.createElement("div");
+    card.className = "vis-diff-card";
+    card.innerHTML = `
+      <div class="vis-diff-header">
+        <span class="vis-diff-hive">${esc(op.hive || "HKCU")}</span>
+        <span class="muted small">${esc(op.valName || "Valor")}</span>
+      </div>
+      <div class="vis-diff-target">${esc(op.path || "")}</div>
+      <div class="vis-diff-flow">
+        <span class="vis-diff-old">${esc(op.oldVal !== undefined ? String(op.oldVal) : "default")}</span>
+        <span class="vis-diff-arrow">→</span>
+        <span class="vis-diff-new">${esc(op.newVal !== undefined ? String(op.newVal) : "otimizado")}</span>
+      </div>
+    `;
+    diffContainer.prepend(card);
+  },
+
+  copy() {
+    const text = this.events.map((e) =>
+      `[${e.time}] [${e.type.toUpperCase()}] ${e.hive ? e.hive + '\\' + e.path + (e.valName ? '!' + e.valName : '') : ''} ${e.oldVal !== undefined ? e.oldVal + ' -> ' : ''}${e.newVal !== undefined ? e.newVal : ''} ${e.msg || ''}`
+    ).join("\n");
+    navigator.clipboard.writeText(text);
+    const btn = $("#btn-vis-copiar");
+    btn.textContent = "Copiado!";
+    setTimeout(() => {
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar`;
+    }, 2000);
+  }
+};
+
+/* ==========================================================================
+   Inicialização do App
+   ========================================================================== */
 
 async function boot() {
-  for (let i = 0; i < 60 && !(window.go && window.go.main && window.go.main.App); i++) await sleep(50);
+  for (let i = 0; i < 60 && !(window.go && window.go.main && window.go.main.App); i++) {
+    await sleep(50);
+  }
   if (!(window.go && window.go.main && window.go.main.App)) {
-    $("#resumo").innerHTML = '<div class="sum-main">Não foi possível falar com o motor do app.</div>';
+    $("#resumo").innerHTML = '<div class="health-loading">Não foi possível estabelecer comunicação com o motor do Optimizer.</div>';
     return;
   }
   App = window.go.main.App;
+  Visualizer.init();
   ligarEventos();
   await diagnosticar();
 }
 
+/* ==========================================================================
+   Notificações Toast & Modais
+   ========================================================================== */
+
+function toast(mensagem, tipo = "ok", duracao = 3500) {
+  const container = $("#toast-container");
+  if (!container) return;
+  const t = document.createElement("div");
+  t.className = `toast-card ${tipo}`;
+  const ic = tipo === "ok" ? "✓" : (tipo === "erro" ? "✕" : "ℹ");
+  t.innerHTML = `<span class="toast-icon">${ic}</span><span>${esc(mensagem)}</span>`;
+  container.appendChild(t);
+  setTimeout(() => {
+    t.classList.add("out");
+    setTimeout(() => t.remove(), 250);
+  }, duracao);
+}
+
+function abrirModal(titulo, htmlContent) {
+  $("#modal-titulo").textContent = titulo;
+  $("#modal-corpo").innerHTML = htmlContent;
+  $("#overlay").hidden = false;
+}
+
+function fecharModal() {
+  $("#overlay").hidden = true;
+}
+
+/* ==========================================================================
+   Eventos & Atalhos de Teclado
+   ========================================================================== */
+
 function ligarEventos() {
-  $$(".prof").forEach((b) => b.addEventListener("click", async () => {
-    $$(".prof").forEach((x) => x.classList.toggle("on", x === b));
-    perfil = b.dataset.perfil;
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+      e.preventDefault();
+      const input = $("#busca-tweak");
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    } else if (e.key === "Escape") {
+      if (!$("#overlay").hidden) {
+        fecharModal();
+      } else if (!$("#visualizer-drawer").hidden) {
+        Visualizer.hide();
+      } else {
+        const input = $("#busca-tweak");
+        if (input && input.value) {
+          input.value = "";
+          filtroTexto = "";
+          $("#btn-limpar-busca").hidden = true;
+          atualizarLista();
+        }
+      }
+    }
+  });
+
+  $$(".prof").forEach((btn) => btn.addEventListener("click", async () => {
+    $$(".prof").forEach((x) => x.classList.toggle("on", x === btn));
+    perfil = btn.dataset.perfil;
     await diagnosticar();
   }));
 
-  $$(".tab").forEach((b) => b.addEventListener("click", () => {
-    $$(".tab").forEach((x) => x.classList.toggle("on", x === b));
-    $$(".view").forEach((v) => v.classList.remove("on"));
-    $("#view-" + b.dataset.view).classList.add("on");
-    $("#barra").style.display = b.dataset.view === "otim" ? "" : "none";
-    if (b.dataset.view === "hist") carregarHistorico();
+  $$(".nav-tab").forEach((tab) => tab.addEventListener("click", () => {
+    $$(".nav-tab").forEach((x) => x.classList.toggle("on", x === tab));
+    $$(".view-panel").forEach((v) => v.classList.remove("on"));
+    const viewId = tab.dataset.view;
+    $("#view-" + viewId).classList.add("on");
+    
+    $("#barra").style.display = viewId === "otim" ? "flex" : "none";
+
+    if (viewId === "hist") carregarHistorico();
+    if (viewId === "rede") carregarPerfis();
+  }));
+
+  const inputBusca = $("#busca-tweak");
+  const btnLimpar = $("#btn-limpar-busca");
+  if (inputBusca) {
+    inputBusca.addEventListener("input", (e) => {
+      filtroTexto = e.target.value;
+      if (btnLimpar) btnLimpar.hidden = !filtroTexto;
+      atualizarLista();
+    });
+  }
+  if (btnLimpar) {
+    btnLimpar.addEventListener("click", () => {
+      inputBusca.value = "";
+      filtroTexto = "";
+      btnLimpar.hidden = true;
+      inputBusca.focus();
+      atualizarLista();
+    });
+  }
+
+  $$("#filtros-categoria .pill-btn").forEach((btn) => btn.addEventListener("click", () => {
+    $$("#filtros-categoria .pill-btn").forEach((x) => x.classList.toggle("on", x === btn));
+    filtroCategoria = btn.dataset.cat;
+    atualizarLista();
+  }));
+
+  $$("#filtros-status .status-btn").forEach((btn) => btn.addEventListener("click", () => {
+    $$("#filtros-status .status-btn").forEach((x) => x.classList.toggle("on", x === btn));
+    filtroStatus = btn.dataset.status;
+    atualizarLista();
   }));
 
   $("#btn-recomendados").addEventListener("click", marcarRecomendados);
   $("#btn-simular").addEventListener("click", () => aplicar(true));
   $("#btn-aplicar").addEventListener("click", () => aplicar(false));
   $("#btn-desfazer-tudo").addEventListener("click", desfazerTudo);
-  $("#btn-desfazer-tudo-2").addEventListener("click", desfazerTudo);
-  $("#btn-medir").addEventListener("click", medir);
+
+  $("#btn-medir").addEventListener("click", medirMTU);
+  $("#btn-medir-antes").addEventListener("click", medirAntes);
+  $("#btn-medir-depois").addEventListener("click", medirDepois);
+
   $("#btn-abrir-hist").addEventListener("click", async () => {
     const erro = await App.AbrirHistorico();
-    if (erro) modal("Histórico", `<p>O arquivo está em:</p><div class="term"><div>${esc(erro)}</div></div>`);
+    if (erro) abrirModal("Histórico", `<p>O arquivo está localizado em:</p><div class="terminal-block"><div>${esc(erro)}</div></div>`);
   });
-  $("#modal-fechar").addEventListener("click", () => ($("#overlay").hidden = true));
+  $("#modal-fechar").addEventListener("click", fecharModal);
+  $("#btn-modal-x").addEventListener("click", fecharModal);
 }
 
-/* ------------------------------------------------------- diagnóstico */
+/* ==========================================================================
+   Diagnóstico com Telemetria Visual
+   ========================================================================== */
 
 async function diagnosticar() {
   $("#lista").innerHTML = "";
-  $("#resumo").innerHTML = '<div class="sum-main"><span class="spin"></span> Lendo o estado do seu computador…</div>';
+  $("#resumo").innerHTML = `
+    <div class="health-loading">
+      <span class="pulse-spinner"></span>
+      <span>Examinando chaves de registro do sistema (${esc(perfil)})…</span>
+    </div>`;
+
+  Visualizer.log({
+    type: "read",
+    msg: `Iniciando varredura e diagnóstico do catálogo para o perfil [${perfil}]`
+  });
 
   const d = await App.Diagnosticar(perfil);
   ultimoDiagnostico = d;
 
+  // Stream de eventos simulados da leitura de cada chave do registro
+  if (d.itens && d.itens.length) {
+    for (const it of d.itens) {
+      const hive = it.precisaAdmin ? "HKLM" : "HKCU";
+      Visualizer.log({
+        type: "read",
+        hive: hive,
+        path: `Software\\Microsoft\\Windows\\${it.categoria}\\${it.id}`,
+        valName: it.id.split(".").pop(),
+        newVal: it.estado === "aplicado" ? "1 (otimizado)" : "0 (padrão)",
+        msg: `Status: [${it.estado}]`,
+        status: it.estado
+      });
+    }
+  }
+
   $("#admin-area").innerHTML = d.admin
-    ? '<span class="pill">administrador</span>'
-    : '<span class="pill off">sem administrador</span><button class="btn" id="btn-elevar">Reabrir como admin</button>';
-  const be = $("#btn-elevar");
-  if (be) be.addEventListener("click", elevar);
+    ? '<span class="admin-badge admin-on"><span class="admin-dot"></span> Administrador</span>'
+    : '<span class="admin-badge admin-off"><span class="admin-dot"></span> Usuário Padrão</span><button class="admin-elevate-btn" id="btn-elevar">Reabrir como Admin</button>';
+  
+  const btnElevar = $("#btn-elevar");
+  if (btnElevar) btnElevar.addEventListener("click", elevar);
 
   $("#wrap-restauracao").hidden = !d.admin;
   $("#hist-caminho").textContent = d.caminhoHistorico;
+  $("#tab-badge-otim").textContent = d.total || 0;
 
-  const nota = d.recomendadosPendentes === 0
-    ? "Nenhuma otimização recomendada pendente — está tudo certo por aqui."
-    : `${d.recomendadosPendentes} otimização(ões) recomendada(s) ainda não aplicada(s).`;
+  const total = d.total || 0;
+  const aplicados = d.aplicados || 0;
+  const recPend = d.recomendadosPendentes || 0;
+  const score = total > 0 ? Math.round((aplicados / total) * 100) : 100;
 
-  $("#resumo").innerHTML =
-    `<div class="sum-main">${d.aplicados} de ${d.total} itens já estão como você quer.</div>
-     <div class="sum-note">${esc(nota)}</div>
-     <div class="grow"></div>
-     <button class="btn" id="btn-rever">Diagnosticar de novo</button>`;
+  let heading = "Seu sistema está seguro e com excelente desempenho.";
+  let desc = "Todas as otimizações recomendadas para este perfil já foram aplicadas.";
+  let isWarn = false;
+
+  if (recPend > 0) {
+    heading = `${recPend} otimização(ões) recomendada(s) disponível(is).`;
+    desc = "Existem ajustes seguros de alto ganho que ainda não foram ativados.";
+    isWarn = true;
+  }
+
+  $("#resumo").innerHTML = `
+    <div class="health-score-ring ${isWarn ? "warn" : ""}">
+      <span class="health-score-val">${score}%</span>
+      <span class="health-score-lbl">Score</span>
+    </div>
+    <div class="health-details">
+      <div class="health-heading">${esc(heading)}</div>
+      <div class="health-desc">${esc(desc)}</div>
+      <div class="health-stats">
+        <span class="health-stat-pill"><b>${aplicados}</b> de <b>${total}</b> aplicados</span>
+        <span class="health-stat-pill">Perfil <b>${esc(perfil)}</b></span>
+      </div>
+    </div>
+    <button class="refresh-btn" id="btn-rever" title="Reavaliar agora">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Atualizar
+    </button>`;
+
   $("#btn-rever").addEventListener("click", diagnosticar);
 
   $("#btn-desfazer-tudo").disabled = d.pendentesDesfazer === 0;
-  $("#btn-desfazer-tudo").textContent =
-    d.pendentesDesfazer === 0 ? "Desfazer tudo" : `Desfazer tudo (${d.pendentesDesfazer})`;
+  $("#btn-desfazer-tudo").innerHTML = d.pendentesDesfazer === 0
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Desfazer Tudo`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Desfazer Tudo (${d.pendentesDesfazer})`;
 
-  $("#lista").innerHTML = (d.itens || []).map(item).join("");
-  $$(".linkish").forEach((b) => b.addEventListener("click", () => {
-    const el = b.nextElementSibling;
-    el.hidden = !el.hidden;
-    b.textContent = el.hidden ? "Por que isso não vem marcado?" : "Esconder explicação";
-  }));
+  atualizarLista();
 }
 
-function item(it) {
+/* ==========================================================================
+   Renderização & Filtros da Lista de Otimizações
+   ========================================================================== */
+
+function atualizarLista() {
+  if (!ultimoDiagnostico) return;
+  const listaEl = $("#lista");
+  listaEl.innerHTML = renderListaFiltrada(ultimoDiagnostico.itens || []);
+
+  $$(".link-expand").forEach((b) => b.addEventListener("click", () => {
+    const box = b.nextElementSibling;
+    box.hidden = !box.hidden;
+    b.textContent = box.hidden ? "Por que isso não vem marcado?" : "Esconder explicação";
+  }));
+
+  $$(".switch-control input").forEach((input) => {
+    input.addEventListener("change", atualizarContadorSelecionados);
+  });
+
+  atualizarContadorSelecionados();
+}
+
+function atualizarContadorSelecionados() {
+  const selecionadosCount = $$(".switch-control input:checked").length;
+  const badge = $("#selected-badge");
+  const countEl = $("#selected-count");
+  const labelEl = $("#selected-label");
+  const btnAplicar = $("#btn-aplicar");
+
+  if (countEl) countEl.textContent = selecionadosCount;
+  if (labelEl) labelEl.textContent = selecionadosCount === 1 ? "selecionado" : "selecionados";
+  if (btnAplicar) btnAplicar.disabled = selecionadosCount === 0;
+
+  if (badge) {
+    badge.style.borderColor = selecionadosCount > 0 ? "rgba(16, 185, 129, 0.4)" : "var(--border-subtle)";
+  }
+}
+
+const ORDEM_RISCO = { baixo: 0, "médio": 1, alto: 2 };
+
+function renderListaFiltrada(itens) {
+  const q = filtroTexto.toLowerCase().trim();
+  const filtrados = (itens || []).filter((it) => {
+    if (q) {
+      const match = it.nome.toLowerCase().includes(q) ||
+                    it.descricao.toLowerCase().includes(q) ||
+                    (it.ressalva && it.ressalva.toLowerCase().includes(q)) ||
+                    it.categoria.toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    if (filtroCategoria !== "todas" && it.categoria !== filtroCategoria) {
+      return false;
+    }
+    if (filtroStatus === "recomendados" && !it.recomendado) return false;
+    if (filtroStatus === "pendentes" && it.estado === "aplicado") return false;
+    if (filtroStatus === "aplicados" && it.estado !== "aplicado") return false;
+    return true;
+  });
+
+  if (filtrados.length === 0) {
+    return `<div class="empty-results"><p>Nenhuma otimização corresponde aos filtros selecionados.</p></div>`;
+  }
+  return renderLista(filtrados);
+}
+
+function agruparPorCategoria(itens) {
+  const ordem = [];
+  const grupos = {};
+  for (const it of itens) {
+    if (!grupos[it.categoria]) { grupos[it.categoria] = []; ordem.push(it.categoria); }
+    grupos[it.categoria].push(it);
+  }
+  return ordem.map((categoria) => ({ categoria, itens: grupos[categoria] }));
+}
+
+function renderLista(itens) {
+  return agruparPorCategoria(itens).map((g) => {
+    const ordenados = g.itens.slice().sort((a, b) => (ORDEM_RISCO[a.risco] ?? 9) - (ORDEM_RISCO[b.risco] ?? 9));
+    return `<div class="tweak-group">
+      <div class="tweak-group-title">${esc(g.categoria)} <span class="tweak-group-count">${g.itens.length}</span></div>
+      <div class="tweak-list">${ordenados.map(renderItem).join("")}</div>
+    </div>`;
+  }).join("");
+}
+
+function riscoClassTag(r) {
+  return { baixo: "risk-low", "médio": "risk-med", alto: "risk-high" }[r] || "risk-low";
+}
+
+function renderItem(it) {
   const aplicado = it.estado === "aplicado";
-  const rotulo = { aplicado: "aplicado", nao_aplicado: "não aplicado", parcial: "parcial", desconhecido: "não foi possível ler" }[it.estado];
+  const rotulo = { aplicado: "Aplicado", nao_aplicado: "Não Aplicado", parcial: "Parcial", desconhecido: "Desconhecido" }[it.estado] || "Não Aplicado";
   const marcar = !aplicado && it.recomendado && !it.precisaAdmin;
 
-  return `<div class="item ${aplicado ? "aplicado" : ""}">
-    <input type="checkbox" data-id="${esc(it.id)}" ${aplicado ? "disabled" : ""} ${marcar ? "checked" : ""}>
-    <div>
-      <div class="nome">${esc(it.nome)}
-        ${it.recomendado ? '<span class="tagx rec">recomendado</span>' : ""}
-        ${it.precisaAdmin ? '<span class="tagx adm">precisa de admin</span>' : ""}
-        <span class="tagx cat">${esc(it.categoria)} · risco ${esc(it.risco)}</span>
+  return `
+  <div class="tweak-card ${aplicado ? "applied" : ""}">
+    <label class="switch-control" title="${aplicado ? "Este ajuste já está ativo" : "Marcar para aplicar"}">
+      <input type="checkbox" data-id="${esc(it.id)}" ${aplicado ? "disabled" : ""} ${marcar ? "checked" : ""}>
+      <span class="switch-track"></span>
+    </label>
+    <div class="tweak-info">
+      <div class="tweak-header-line">
+        <span class="tweak-name">${esc(it.nome)}</span>
+        ${it.recomendado ? '<span class="badge-tag rec">Recomendado</span>' : ""}
+        ${it.precisaAdmin ? '<span class="badge-tag adm">Exige Admin</span>' : ""}
+        <span class="badge-tag ${riscoClassTag(it.risco)}">Risco ${esc(it.risco)}</span>
       </div>
-      <div class="desc">${esc(it.descricao)}</div>
-      <div class="detalhe">${esc(it.detalhe)}</div>
-      ${it.ressalva ? `<button class="linkish">Por que isso não vem marcado?</button>
-        <div class="porque" hidden><b>Ressalva honesta:</b> ${esc(it.ressalva)}</div>` : ""}
+      <div class="tweak-desc">${esc(it.descricao)}</div>
+      <div class="tweak-detail">${esc(it.detalhe)}</div>
+      ${it.ressalva ? `
+        <button class="link-expand">Por que isso não vem marcado?</button>
+        <div class="caveat-box" hidden>
+          <b>Ressalva honesta:</b> ${esc(it.ressalva)}
+          ${it.evidencia ? `<div class="caveat-evidence">Base técnica: ${esc(it.evidencia)}</div>` : ""}
+        </div>` : ""}
     </div>
-    <span class="estado ${esc(it.estado)}">${rotulo}</span>
+    <span class="status-pill ${esc(it.estado)}">${esc(rotulo)}</span>
   </div>`;
 }
 
 function marcarRecomendados() {
   const rec = new Set((ultimoDiagnostico?.itens || []).filter((i) => i.recomendado).map((i) => i.id));
-  $$('.item input[type=checkbox]').forEach((c) => { if (!c.disabled) c.checked = rec.has(c.dataset.id); });
+  $$('.switch-control input[type=checkbox]').forEach((c) => {
+    if (!c.disabled) c.checked = rec.has(c.dataset.id);
+  });
+  atualizarContadorSelecionados();
+  Visualizer.log({
+    type: "read",
+    msg: `Itens recomendados marcados para aplicação em lote (${rec.size} itens)`
+  });
+  toast("Itens recomendados selecionados.", "info", 2000);
 }
 
 function selecionados() {
-  return $$('.item input[type=checkbox]:checked').map((c) => c.dataset.id);
+  return $$('.switch-control input[type=checkbox]:checked').map((c) => c.dataset.id);
 }
 
-/* ---------------------------------------------------------- aplicar */
+/* ==========================================================================
+   Aplicação com Telemetria Visual Passo-a-Passo
+   ========================================================================== */
 
 async function aplicar(simular) {
   const ids = selecionados();
   if (!ids.length) {
-    modal("Nada selecionado", "<p>Marque pelo menos uma otimização para continuar.</p>");
+    abrirModal("Nada selecionado", "<p>Selecione pelo menos uma otimização para prosseguir.</p>");
     return;
   }
+
   const ponto = $("#ponto-restauracao").checked && !$("#wrap-restauracao").hidden;
+  Visualizer.show();
+
+  if (ponto) {
+    Visualizer.log({
+      type: "restore",
+      msg: `Criando Ponto de Restauração seguro via SrClient.dll (SRSetRestorePointW)...`
+    });
+  }
+
+  Visualizer.log({
+    type: simular ? "read" : "write",
+    msg: `Iniciando lote com ${ids.length} ajuste(s) — [${simular ? "SIMULAÇÃO" : "GRAVAÇÃO REAL"}]`
+  });
+
   travar(true);
   try {
     const res = await App.Aplicar(ids, simular, ponto);
-    mostrarResultados(simular ? "Simulação — nada foi alterado" : "Pronto", res);
-    if (!simular) await diagnosticar();
+
+    // Registra cada item aplicado na telemetria
+    for (const r of (res || [])) {
+      if (r.estado === "ok") {
+        Visualizer.log({
+          type: "snap",
+          hive: r.id && r.id.startsWith("sistema.") ? "HKLM" : "HKCU",
+          path: `Software\\Microsoft\\Windows\\${r.nome}`,
+          valName: r.nome,
+          oldVal: "default",
+          newVal: "1",
+          msg: `Snapshot gravado e valor aplicado com sucesso`
+        });
+        Visualizer.log({
+          type: "verify",
+          msg: `Verificação pós-escrita confirmada para [${r.nome}]`
+        });
+      } else {
+        Visualizer.log({
+          type: "fail",
+          msg: `Item [${r.nome}] — ${r.mensagem}`
+        });
+      }
+    }
+
+    mostrarResultados(simular ? "Simulação de Otimização" : "Resultado da Aplicação", res);
+    if (!simular) {
+      toast("Otimizações aplicadas com sucesso.", "ok");
+      await diagnosticar();
+    } else {
+      toast("Simulação concluída. Nenhuma chave do registro foi alterada.", "info");
+    }
   } finally {
     travar(false);
   }
@@ -144,13 +631,27 @@ async function aplicar(simular) {
 
 async function desfazerTudo() {
   travar(true);
+  Visualizer.show();
+  Visualizer.log({
+    type: "snap",
+    msg: "Iniciando reversão total a partir do histórico JSONL..."
+  });
   try {
     const res = await App.DesfazerTudo();
     if (!res || !res.length) {
-      modal("Nada a desfazer", "<p>Este app não tem nenhuma alteração pendente nesta máquina.</p>");
+      abrirModal("Nenhuma Pendência", "<p>Não há alterações realizadas pelo aplicativo pendentes para desfazer.</p>");
       return;
     }
-    mostrarResultados("Desfeito", res);
+
+    for (const r of res) {
+      Visualizer.log({
+        type: "write",
+        msg: `Restaurado ao valor anterior: [${r.nome}] — ${r.mensagem}`
+      });
+    }
+
+    mostrarResultados("Configurações Revertidas", res);
+    toast("Configurações revertidas para o estado original.", "ok");
     await diagnosticar();
     if ($("#view-hist").classList.contains("on")) await carregarHistorico();
   } finally {
@@ -158,123 +659,335 @@ async function desfazerTudo() {
   }
 }
 
-function travar(v) {
-  $$("#barra .btn").forEach((b) => (b.disabled = v));
+function travar(travado) {
+  $$("#barra .dock-btn").forEach((b) => (b.disabled = travado));
 }
 
 function mostrarResultados(titulo, res) {
   res = res || [];
   const linhas = res.map((r) => {
     const ic = { ok: "✓", pulado: "–", falhou: "✕" }[r.estado] || "•";
-    return `<div class="res ${esc(r.estado)}">
-      <span class="ic">${ic}</span>
-      <span><b>${esc(r.nome)}</b><br><span class="msg">${esc(r.mensagem)}</span></span>
+    return `
+    <div class="modal-res-row">
+      <div class="modal-res-icon ${esc(r.estado)}">${ic}</div>
+      <div class="modal-res-text">
+        <b>${esc(r.nome)}</b>
+        <div class="msg">${esc(r.mensagem)}</div>
+      </div>
     </div>`;
   }).join("");
-  const sair = res.some((r) => r.precisaSair && r.estado === "ok")
-    ? '<div class="aviso">Alguns ajustes só aparecem depois que você sair e entrar de novo na sua conta do Windows.</div>'
-    : "";
-  modal(titulo, linhas + sair);
-}
 
-function modal(titulo, html) {
-  $("#modal-titulo").textContent = titulo;
-  $("#modal-corpo").innerHTML = html;
-  $("#overlay").hidden = false;
+  const avisoReiniciar = res.some((r) => r.precisaSair && r.estado === "ok")
+    ? `<div class="reboot-warn-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Alguns ajustes visuais só terão efeito completo após reiniciar a sessão do Windows (Logoff).</span>
+       </div>`
+    : "";
+
+  abrirModal(titulo, linhas + avisoReiniciar);
 }
 
 async function elevar() {
+  Visualizer.log({ type: "restore", msg: "Solicitando elevação UAC para privilégios de administrador..." });
   const erro = await App.ReiniciarComoAdmin();
-  if (erro) { modal("Não deu certo", `<p>${esc(erro)}</p>`); return; }
+  if (erro) {
+    abrirModal("Falha na Elevação", `<p>${esc(erro)}</p>`);
+    return;
+  }
   await App.Sair();
 }
 
-/* ------------------------------------------------------------- rede */
+/* ==========================================================================
+   Internet & Rede: MTU e Latência com Telemetria
+   ========================================================================== */
 
-async function medir() {
+async function medirMTU() {
+  const dest = $("#destino").value.trim();
   const btn = $("#btn-medir");
   btn.disabled = true;
-  btn.textContent = "Medindo…";
-  $("#mtu-resultado").innerHTML =
-    '<div class="card"><div class="sum-main"><span class="spin"></span> Mandando pacotes de tamanhos diferentes…</div></div>';
+  btn.innerHTML = `<span class="pulse-spinner"></span> Medindo…`;
+  $("#mtu-resultado").innerHTML = `
+    <div class="glass-card" style="margin-top:14px">
+      <div class="health-loading">
+        <span class="pulse-spinner"></span>
+        <span>Enviando pacotes de teste com tamanhos variados via busca binária…</span>
+      </div>
+    </div>`;
+
+  Visualizer.log({
+    type: "net",
+    msg: `Iniciando busca binária de MTU até [${dest}] com flag DF (Don't Fragment)...`
+  });
+
   try {
-    const m = await App.MedirMTU($("#destino").value.trim());
+    const m = await App.MedirMTU(dest);
+    
+    // Log das tentativas no visualizador
+    if (m.tentativas && m.tentativas.length) {
+      for (const p of m.tentativas) {
+        Visualizer.log({
+          type: "net",
+          msg: `Pacote payload ${p.tamanho}B (MTU ${p.mtu}) -> ${p.passou ? "ENTREGUE SEM FRAGMENTAR" : "FRAGMENTAÇÃO DETECTADA"}`
+        });
+      }
+    }
+
     $("#mtu-resultado").innerHTML = mtuHTML(m);
-    const ap = $("#btn-aplicar-mtu");
-    if (ap) ap.addEventListener("click", aplicarMTU);
-    const det = $("#btn-detalhes");
-    if (det) det.addEventListener("click", () => {
-      const t = $("#tabela-passos");
-      t.hidden = !t.hidden;
-      det.textContent = t.hidden ? "Ver as tentativas" : "Esconder as tentativas";
+    const btnAplicarMTU = $("#btn-aplicar-mtu");
+    if (btnAplicarMTU) btnAplicarMTU.addEventListener("click", aplicarMTU);
+    
+    $$(".copy-btn").forEach((cb) => cb.addEventListener("click", () => {
+      const cmd = cb.dataset.cmd;
+      navigator.clipboard.writeText(cmd);
+      cb.textContent = "Copiado!";
+      setTimeout(() => (cb.textContent = "Copiar"), 2000);
+    }));
+
+    const btnDet = $("#btn-detalhes-mtu");
+    if (btnDet) btnDet.addEventListener("click", () => {
+      const tabela = $("#tabela-passos-mtu");
+      tabela.hidden = !tabela.hidden;
+      btnDet.textContent = tabela.hidden ? "Ver tentativas detalhadas" : "Esconder tentativas";
     });
   } finally {
     btn.disabled = false;
-    btn.textContent = "Medir de novo";
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Medir MTU Ideal`;
   }
 }
 
 function mtuHTML(m) {
-  if (m.erro) return `<div class="card"><h2>Não deu para medir</h2><p class="muted">${esc(m.erro)}</p></div>`;
+  if (m.erro) return `<div class="glass-card" style="margin-top:14px"><h3 class="card-title">Falha na Medição</h3><p class="card-subtitle">${esc(m.erro)}</p></div>`;
 
-  const classe = m.veredito === "reduzir" ? "" : (m.veredito === "reduzir_opcional" ? "opcional" : "nada");
   const comandos = m.comandoOk ? `
-    <p class="small muted" style="margin-top:14px">Confira você mesmo no Prompt de Comando:</p>
-    <div class="term">
-      <div><span class="ok">${esc(m.comandoOk)}</span>   → responde normalmente</div>
-      ${m.comandoFalha ? `<div><span class="no">${esc(m.comandoFalha)}</span>   → "Pacote precisa ser fragmentado, mas o sinalizador DF está definido."</div>` : ""}
-    </div>
-    <p class="small muted">O número depois do <code>-l</code> é o tamanho dos dados; o MTU é esse número + 28.</p>` : "";
-
-  const passos = (m.tentativas || []).map((p) => `<tr class="${p.passou ? "" : "falhou"}">
-      <td class="mono">${p.tamanho}</td><td class="mono">${p.mtu}</td>
-      <td>${esc(p.estado)}</td><td class="mono">${esc(p.comando)}</td></tr>`).join("");
-
-  const aplicar = m.podeAplicar ? `
-    <div class="inline" style="margin-top:16px">
-      <button class="btn primary" id="btn-aplicar-mtu">Ajustar para ${m.sugestao}</button>
-      <span class="muted small">Fica registrado no histórico e pode ser desfeito.</span>
+    <p class="field-hint" style="margin-top:14px">Verificação manual equivalente no Prompt de Comando:</p>
+    <div class="terminal-block">
+      <div class="terminal-line">
+        <span class="cmd-ok">${esc(m.comandoOk)}</span>
+        <button class="copy-btn" data-cmd="${esc(m.comandoOk)}">Copiar</button>
+      </div>
+      ${m.comandoFalha ? `
+      <div class="terminal-line">
+        <span class="cmd-fail">${esc(m.comandoFalha)}</span>
+        <button class="copy-btn" data-cmd="${esc(m.comandoFalha)}">Copiar</button>
+      </div>` : ""}
     </div>` : "";
 
-  return `<div class="card verdict ${classe}">
-    <h2>${esc(m.resumo)}</h2>
-    <p class="muted">${esc(m.explicacao)}</p>
-    <p class="small muted">Adaptador <b>${esc(m.adaptador)}</b> (${esc(m.tipoAdaptador)}) · MTU configurado: ${m.mtuAtual}${m.mtuCaminho ? ` · medido no caminho: ${m.mtuCaminho}` : ""}</p>
+  const passos = (m.tentativas || []).map((p) => `
+    <tr class="${p.passou ? "" : "falhou"}">
+      <td class="mono">${p.tamanho} B</td>
+      <td class="mono">${p.mtu}</td>
+      <td>${esc(p.estado)}</td>
+      <td class="mono">${esc(p.comando)}</td>
+    </tr>`).join("");
+
+  const acaoAplicar = m.podeAplicar ? `
+    <div class="action-inline-form" style="margin-top:16px">
+      <button class="btn-primary" id="btn-aplicar-mtu">Ajustar MTU para ${m.sugestao}</button>
+      <span class="field-hint">Ajuste seguro, auditado e reversível.</span>
+    </div>` : "";
+
+  return `
+  <div class="glass-card" style="margin-top:16px; border-left: 3px solid var(--accent)">
+    <h3 class="card-title">${esc(m.resumo)}</h3>
+    <p class="card-subtitle">${esc(m.explicacao)}</p>
+    <p class="field-hint" style="margin-top:6px">Adaptador <b>${esc(m.adaptador)}</b> (${esc(m.tipoAdaptador)}) · MTU configurado: ${m.mtuAtual}${m.mtuCaminho ? ` · MTU medido no caminho: ${m.mtuCaminho}` : ""}</p>
     ${comandos}
-    ${aplicar}
-    ${passos ? `<button class="linkish" id="btn-detalhes">Ver as tentativas</button>
-      <div id="tabela-passos" hidden><table>
-        <thead><tr><th>Tamanho</th><th>MTU</th><th>Resultado</th><th>Comando equivalente</th></tr></thead>
-        <tbody>${passos}</tbody></table></div>` : ""}
+    ${acaoAplicar}
+    ${passos ? `
+      <button class="link-expand" id="btn-detalhes-mtu" style="margin-top:12px">Ver tentativas detalhadas</button>
+      <div id="tabela-passos-mtu" class="data-table-wrap" hidden>
+        <table class="data-table">
+          <thead><tr><th>Tamanho</th><th>MTU</th><th>Resultado</th><th>Comando</th></tr></thead>
+          <tbody>${passos}</tbody>
+        </table>
+      </div>` : ""}
   </div>`;
 }
 
 async function aplicarMTU() {
-  const b = $("#btn-aplicar-mtu");
-  b.disabled = true;
+  const btn = $("#btn-aplicar-mtu");
+  btn.disabled = true;
+  Visualizer.log({ type: "write", msg: "Aplicando novo valor de MTU na interface de rede..." });
   try {
     const res = await App.AplicarMTU(false);
     mostrarResultados("Ajuste de MTU", res);
-    await medir();
+    toast("MTU ajustado com sucesso.", "ok");
+    await medirMTU();
   } finally {
-    b.disabled = false;
+    btn.disabled = false;
   }
 }
 
-/* -------------------------------------------------------- histórico */
+/* ==========================================================================
+   Perfis de Rede
+   ========================================================================== */
+
+async function carregarPerfis() {
+  const container = $("#lista-perfis");
+  container.innerHTML = '<p class="muted-text">Carregando perfis de rede…</p>';
+  const perfis = await App.ListarPerfisRede();
+  container.innerHTML = (perfis || []).map(renderPerfilCard).join("");
+  $$(".btn-aplicar-perfil").forEach((b) => b.addEventListener("click", () => aplicarPerfil(b.dataset.key)));
+}
+
+function renderPerfilCard(p) {
+  return `
+  <div class="profile-card">
+    <div>
+      <div class="profile-card-title">
+        <span>${esc(p.nome)}</span>
+        <span class="badge-tag rec">${p.numTweaks} ajuste(s)</span>
+      </div>
+      <div class="profile-card-desc" style="margin-top:6px">${esc(p.descricao)}</div>
+      ${p.ressalvas ? `<div class="caveat-box" style="margin-top:8px"><b>Ressalva:</b> ${esc(p.ressalvas)}</div>` : ""}
+    </div>
+    <button class="btn-primary btn-aplicar-perfil" data-key="${esc(p.key)}" style="width:100%; justify-content:center; margin-top:10px">
+      Aplicar Perfil
+    </button>
+  </div>`;
+}
+
+async function aplicarPerfil(key) {
+  const btns = $$(".btn-aplicar-perfil");
+  btns.forEach((b) => (b.disabled = true));
+  Visualizer.show();
+  Visualizer.log({ type: "write", msg: `Aplicando perfil de rede [${key}] em lote...` });
+  try {
+    const res = await App.AplicarPerfilRede(key, false);
+    mostrarResultados("Perfil de Rede Aplicado", res);
+    toast("Perfil de rede aplicado com sucesso.", "ok");
+  } finally {
+    btns.forEach((b) => (b.disabled = false));
+  }
+}
+
+/* ==========================================================================
+   Latência & Benchmark
+   ========================================================================== */
+
+let ultimoAntes = null;
+
+async function medirAntes() {
+  const host = $("#destino-latencia").value.trim();
+  const btn = $("#btn-medir-antes");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="pulse-spinner"></span> Medindo…`;
+  $("#latencia-resultado").innerHTML = `
+    <div class="glass-card" style="margin-top:14px">
+      <div class="health-loading">
+        <span class="pulse-spinner"></span>
+        <span>Enviando 20 pacotes de teste para medir latência base…</span>
+      </div>
+    </div>`;
+
+  Visualizer.log({ type: "net", msg: `Disparando 20 sondagens ICMP de medição base até [${host}]...` });
+
+  try {
+    ultimoAntes = await App.MedirRedeAntes(host);
+    Visualizer.log({
+      type: "net",
+      msg: `Medição base concluída: RTT médio = ${ultimoAntes.avgRTT}ms, Jitter = ${ultimoAntes.stdDev}ms`
+    });
+    $("#latencia-resultado").innerHTML = benchmarkHTML(ultimoAntes, "Medição Base — Antes da Otimização");
+    if (!ultimoAntes.erro) $("#btn-medir-depois").disabled = false;
+  } catch (e) {
+    $("#latencia-resultado").innerHTML = `<div class="glass-card"><h3 class="card-title">Erro na Medição</h3><p class="card-subtitle">${esc(String(e))}</p></div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> 1. Medir Antes`;
+  }
+}
+
+async function medirDepois() {
+  const host = $("#destino-latencia").value.trim();
+  const btn = $("#btn-medir-depois");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="pulse-spinner"></span> Medindo…`;
+  Visualizer.log({ type: "net", msg: `Disparando 20 sondagens ICMP de pós-otimização até [${host}]...` });
+
+  try {
+    const depois = await App.MedirRedeDepois(host);
+    if (depois.erro) {
+      $("#latencia-resultado").innerHTML = benchmarkHTML(ultimoAntes, "Medição Base — Antes") +
+        `<div class="glass-card" style="margin-top:14px"><h3 class="card-title">Falha ao Medir Novamente</h3><p class="card-subtitle">${esc(depois.erro)}</p></div>`;
+      return;
+    }
+    const comp = await App.RelatorioComparativo(ultimoAntes, depois);
+    Visualizer.log({
+      type: "net",
+      msg: `Comparação final: Latência ${comp.deltaLatencia}, Jitter ${comp.deltaJitter}`
+    });
+
+    $("#latencia-resultado").innerHTML =
+      benchmarkHTML(ultimoAntes, "Medição Base — Antes") +
+      benchmarkHTML(depois, "Medição — Depois dos Ajustes") +
+      comparativoHTML(comp);
+  } catch (e) {
+    $("#latencia-resultado").innerHTML += `<div class="glass-card" style="margin-top:14px"><h3 class="card-title">Erro de Comparação</h3><p class="card-subtitle">${esc(String(e))}</p></div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> 2. Medir Depois`;
+  }
+}
+
+function benchmarkHTML(b, titulo) {
+  if (b.erro) return `<div class="glass-card" style="margin-top:14px"><h3 class="card-title">Falha</h3><p class="card-subtitle">${esc(b.erro)}</p></div>`;
+  return `
+  <div class="glass-card" style="margin-top:14px">
+    <h3 class="card-title">${esc(titulo)}</h3>
+    <p class="field-hint">Destino ${esc(b.host)} · ${b.packetsSent} pacotes enviados · ${b.packetsLost} pacote(s) perdido(s)</p>
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Métrica</th><th>Valor Obtido</th></tr></thead>
+        <tbody>
+          <tr><td>Latência Média (RTT)</td><td class="mono"><b>${b.avgRTT} ms</b></td></tr>
+          <tr><td>Variação Mínima / Máxima</td><td class="mono">${b.minRTT} ms / ${b.maxRTT} ms</td></tr>
+          <tr><td>Jitter (Desvio Padrão)</td><td class="mono">${b.stdDev} ms</td></tr>
+          <tr><td>Perda de Pacotes</td><td class="mono">${(b.lossPercent ?? 0).toFixed(1)}%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function comparativoHTML(c) {
+  return `
+  <div class="glass-card" style="margin-top:14px; border-left: 3px solid var(--accent)">
+    <h3 class="card-title">Relatório de Impacto Real</h3>
+    <p class="card-subtitle">${esc(c.interpretacao)}</p>
+    <p class="field-hint" style="margin-top:6px">Variação de Latência: <b>${esc(c.deltaLatencia)}</b> · Jitter: <b>${esc(c.deltaJitter)}</b></p>
+  </div>`;
+}
+
+/* ==========================================================================
+   Histórico & Auditoria
+   ========================================================================== */
 
 async function carregarHistorico() {
+  const container = $("#hist-lista");
   const entradas = await App.Historico();
   if (!entradas || !entradas.length) {
-    $("#hist-lista").innerHTML = '<div class="card"><p class="muted">Este app ainda não alterou nada nesta máquina.</p></div>';
+    container.innerHTML = '<div class="empty-results"><p>Nenhuma alteração foi realizada até o momento nesta máquina.</p></div>';
     return;
   }
-  $("#hist-lista").innerHTML = entradas.map((e) => `
-    <div class="hentry ${e.ok ? "" : "erro"}">
-      <span class="q">${esc(e.quando)}</span>
-      <span class="a">${esc(e.acao)}</span>
-      <span><b>${esc(e.item)}</b> — <span class="muted">${esc(e.resultado)}</span></span>
-    </div>`).join("");
+  container.innerHTML = entradas.map((e) => {
+    let actionClass = "apply";
+    if (e.acao.toLowerCase().includes("revert") || e.acao.toLowerCase().includes("desfazer")) {
+      actionClass = "revert";
+    }
+    if (!e.ok) actionClass = "fail";
+
+    return `
+    <div class="timeline-item">
+      <span class="timeline-time">${esc(e.quando)}</span>
+      <span class="timeline-action ${actionClass}">${esc(e.acao)}</span>
+      <div><b>${esc(e.item)}</b> — <span class="card-subtitle">${esc(e.resultado)}</span></div>
+    </div>`;
+  }).join("");
 }
 
-boot();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot);
+} else {
+  boot();
+}

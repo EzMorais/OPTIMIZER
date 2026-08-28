@@ -100,6 +100,9 @@ func (s *Store) Append(e Entry) (Entry, error) {
 	}
 	defer f.Close()
 
+	_ = lockFile(f)
+	defer unlockFile(f)
+
 	line, err := json.Marshal(e)
 	if err != nil {
 		return e, fmt.Errorf("serializando entrada do histórico: %w", err)

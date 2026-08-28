@@ -31,29 +31,24 @@ var NetworkProfiles = map[string]NetworkProfile{
 	"network-remote": {
 		Key:  "network-remote",
 		Name: "Trabalho Remoto",
-		Description: "Otimiza para RDP, SSH, Zoom e chamadas: desabilita Nagle's Algorithm " +
-			"para reduzir latência de round-trip, favorecendo responsividade em tempo real.",
+		Description: "Otimiza para chamadas de vídeo, compartilhamento e conexões remotas: " +
+			"reduz o tempo de espera de conexões TCP encerradas e desativa criação de thumbs.db em rede.",
 		TweakIDs: []string{
-			// Custom tweaks via WMI (Fase 2, TODO)
-			// "rede.tcp-nodelay-enable",
-			// "rede.tcp-ack-freq-aggressive",
+			"rede.tcp-timed-wait-delay",
+			"rede.thumbs-rede-off",
 		},
-		Caveats: "Pode aumentar overhead de ACK em conexões de alta latência ou Wi-Fi instável. " +
-			"Em banda larga estável, o efeito é imperceptível.",
+		Caveats: "Adequado para uso com VPN, chamadas no Teams/Zoom e trabalho com servidores remotos.",
 	},
 	"network-dev": {
 		Key:  "network-dev",
 		Name: "Desenvolvimento",
 		Description: "Para desenvolvimento com Git, Docker, APIs e transferências de arquivo: " +
-			"foca em throughput e latência baixa, com menos interferência de P2P em background.",
+			"foca em throughput e portas efêmeras, sem interferência de P2P em background.",
 		TweakIDs: []string{
-			// Registry-backed
 			"rede.sem-upload-de-atualizacoes",
-			// Custom tweaks (Fase 2, TODO)
-			// "rede.nic-power-allow-disable",
-			// "rede.rss-enable",
+			"rede.max-user-port",
 		},
-		Caveats: "",
+		Caveats: "Aumenta o número de portas para requisições concorrentes e corta upload de updates.",
 	},
 	"network-presentation": {
 		Key:  "network-presentation",

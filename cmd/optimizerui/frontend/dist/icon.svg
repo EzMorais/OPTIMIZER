@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Fundo Squircle Dark Navy -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="#0b121b"/>
+
+  <!-- Letra P em Verde Esmeralda Vibrante (Sólido & Marcante) -->
+  <path d="M 256 172 C 256 150 274 132 296 132 L 360 132 C 418 132 464 178 464 236 C 464 294 418 340 360 340 L 312 340 L 312 396 C 312 418 294 436 272 436 C 250 436 256 418 256 396 Z M 312 284 L 356 284 C 382 284 404 262 404 236 C 404 210 382 188 356 188 L 312 188 Z" fill="#10b981"/>
+
+  <!-- Personagem Minimalista Branco Empurrando com Esforço -->
+  <!-- Cabeça -->
+  <circle cx="206" cy="180" r="26" fill="#ffffff"/>
+
+  <!-- Braços em Posição de Empurrar -->
+  <path d="M 188 230 L 256 230" stroke="#ffffff" stroke-width="24" stroke-linecap="round"/>
+  <path d="M 172 264 L 260 264" stroke="#ffffff" stroke-width="24" stroke-linecap="round"/>
+
+  <!-- Tronco Inclinado de Força -->
+  <path d="M 194 220 L 166 312" stroke="#ffffff" stroke-width="30" stroke-linecap="round"/>
+
+  <!-- Perna Dianteira Flexionada -->
+  <path d="M 166 312 L 202 368 L 194 424" fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Perna Traseira em Linha Reta de Impulso -->
+  <path d="M 166 312 L 126 384" stroke="#ffffff" stroke-width="26" stroke-linecap="round"/>
+</svg>

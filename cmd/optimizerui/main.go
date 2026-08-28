@@ -28,6 +28,7 @@ func main() {
 		Height:           780,
 		MinWidth:         900,
 		MinHeight:        620,
+		WindowStartState: options.Normal,
 		AssetServer:      &assetserver.Options{Assets: assets},
 		BackgroundColour: &options.RGBA{R: 13, G: 16, B: 18, A: 1},
 		OnStartup:        app.startup,
@@ -35,6 +36,8 @@ func main() {
 		Windows: &wailswin.Options{
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
+			BackdropType:         wailswin.Auto,
+			Theme:                wailswin.Dark,
 		},
 	})
 	if err != nil {

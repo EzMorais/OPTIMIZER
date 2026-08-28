@@ -2,6 +2,7 @@ package netdiag
 
 import (
 	"context"
+	"math"
 	"net/netip"
 	"testing"
 	"time"
@@ -120,9 +121,46 @@ func TestCompareLatencyNoiseZone(t *testing.T) {
 	if delta.LatencyDeltaPercent >= 0 {
 		t.Errorf("esperado delta negativo pequeno, obteve %.1f", delta.LatencyDeltaPercent)
 	}
-	// A interpretação deve mencionar que é ruído/pequeno demais
 	if delta.Interpretation == "" {
 		t.Error("Interpretation não deveria ser vazia")
+	}
+}
+
+func TestCompareLatencyInterpretationBands(t *testing.T) {
+	cases := []struct {
+		name       string
+		beforeRTT  int
+		afterRTT   int
+		lossBefore float64
+		lossAfter  float64
+		wantSubstr string
+	}{
+		{"Piora forte (>10%)", 50, 65, 0, 0, "piorado a conexão"},
+		{"Piora leve (1-10%)", 50, 53, 0, 0, "pequena variação"},
+		{"Melhoria forte (>5%)", 100, 70, 0, 0, "melhoria detectada"},
+		{"Melhoria ruído (0-5%)", 100, 97, 0, 0, "ruído de medição"},
+		{"Estável com menos perda", 50, 50, 5, 0, "Perda de pacotes diminuiu"},
+		{"Estável com mais perda", 50, 50, 0, 5, "perda de pacotes aumentou"},
+		{"Estável idêntico", 50, 50, 0, 0, "Sem mudança perceptível"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			b := Benchmark{Latency: LatencyReport{AvgRTT: tc.beforeRTT}, Loss: tc.lossBefore}
+			a := Benchmark{Latency: LatencyReport{AvgRTT: tc.afterRTT}, Loss: tc.lossAfter}
+			delta := Compare(b, a)
+			if delta.Interpretation == "" {
+				t.Errorf("%s: interpretação vazia", tc.name)
+			}
+		})
+	}
+}
+
+func TestMakeBenchmarkZeroPackets(t *testing.T) {
+	rep := LatencyReport{PacketsSent: 0, PacketsLost: 0}
+	bm := MakeBenchmark(context.Background(), rep, "8.8.8.8")
+	if math.IsNaN(bm.Loss) {
+		t.Error("Loss não deve ser NaN quando PacketsSent == 0")
 	}
 }
 

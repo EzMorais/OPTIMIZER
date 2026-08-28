@@ -14,20 +14,20 @@ import (
 type DriveInfo struct {
 	Letter       string `json:"letter"`
 	Label        string `json:"label"`
-	MediaType    string `json:"mediaType"` // "SSD", "HDD", "Desconhecido"
-	BusType      string `json:"busType"`   // "NVMe", "SATA", "USB"
+	MediaType    string `json:"mediaType"`    // "SSD", "HDD", "Desconhecido"
+	BusType      string `json:"busType"`      // "NVMe", "SATA", "USB"
 	HealthStatus string `json:"healthStatus"` // "OK", "Atenção", "Degradado"
 	SupportsTRIM bool   `json:"supportsTrim"`
 }
 
 // DiskAuditReport contém o resumo de diagnóstico do subsistema de armazenamento.
 type DiskAuditReport struct {
-	Timestamp   time.Time   `json:"timestamp"`
-	Drives      []DriveInfo `json:"drives"`
-	HasSSD      bool        `json:"hasSSD"`
-	HasHDD      bool        `json:"hasHDD"`
-	RecomendaTRIM bool      `json:"recomendaTrim"`
-	Resumo      string      `json:"resumo"`
+	Timestamp     time.Time   `json:"timestamp"`
+	Drives        []DriveInfo `json:"drives"`
+	HasSSD        bool        `json:"hasSSD"`
+	HasHDD        bool        `json:"hasHDD"`
+	RecomendaTRIM bool        `json:"recomendaTrim"`
+	Resumo        string      `json:"resumo"`
 }
 
 // ListarUnidades audita os volumes locais e identifica tipo de mídia (SSD vs HDD).

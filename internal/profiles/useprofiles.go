@@ -1,0 +1,79 @@
+// Package profiles define os perfis de uso fechados JOGO e CODING.
+package profiles
+
+// UseProfile representa um perfil completo de uso do computador.
+type UseProfile struct {
+	Key              string   `json:"key"`
+	Nome             string   `json:"nome"`
+	Objetivo         string   `json:"objetivo"`
+	Descricao        string   `json:"descricao"`
+	Categorias       []string `json:"categorias"`
+	Ressalvas        string   `json:"ressalvas"`
+	TweakIDs         []string `json:"tweakIds"`
+	PowerPlanGUID    string   `json:"powerPlanGuid,omitempty"`
+	DisableSleepAC   bool     `json:"disableSleepAc"`
+	ServicesToPause  []string `json:"servicesToPause,omitempty"`
+	ServicesToEnsure []string `json:"servicesToEnsure,omitempty"`
+}
+
+// ListarPerfisUso devolve as definições oficiais dos perfis JOGO e CODING.
+func ListarPerfisUso() []UseProfile {
+	return []UseProfile{
+		{
+			Key:        "jogo",
+			Nome:       "JOGO — Performance & Baixa Latência",
+			Objetivo:   "Taxa máxima de quadros (FPS), resposta instantânea de entrada e redução de jitter na rede.",
+			Descricao:  "Ativa o plano de Alto Desempenho, prioridade de primeiro plano, MMCSS Games, otimizações de jogos em janela, HAGS e desativa gravação em segundo plano.",
+			Categorias: []string{"Energia", "Jogos", "Visual", "Rede", "Entrada"},
+			Ressalvas:  "Pausa temporariamente a indexação de busca (WSearch) e pré-carregamento (SysMain) para poupar CPU e disco durante a jogatina.",
+			TweakIDs: []string{
+				"jogos.game-mode",
+				"jogos.gamedvr-usuario",
+				"jogos.windowed-optimizations",
+				"visual.hags",
+				"visual.menu-show-delay",
+				"visual.anim-controles",
+				"visual.rastros-mouse",
+				"entrada.mouse-sem-aceleracao",
+				"entrada.sticky-keys-off",
+				"sistema.mmcss-system-responsiveness",
+				"rede.network-throttling-off",
+				"rede.tcp-timed-wait-delay",
+				"rede.max-user-port",
+			},
+			PowerPlanGUID:   "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", // Alto Desempenho
+			DisableSleepAC:  true,
+			ServicesToPause: []string{"WSearch", "SysMain"},
+		},
+		{
+			Key:        "coding",
+			Nome:       "CODING — Compilação & Estabilidade",
+			Objetivo:   "Máximo throughput para IDEs, compilação de código, suporte a caminhos longos e estabilidade para Docker/WSL.",
+			Descricao:  "Mantém suspensão na tomada desativada, habilita Long Paths no sistema de arquivos, desativa carimbo de último acesso NTFS e garante serviços essenciais ativos.",
+			Categorias: []string{"Sistema", "Armazenamento", "Rede", "Produtividade"},
+			Ressalvas:  "Nunca desativa serviços de virtualização, Docker ou Hyper-V. Retoma e preserva a indexação do Windows Search para buscas rápidas no explorador.",
+			TweakIDs: []string{
+				"sistema.long-paths",
+				"armazenamento.trim-ntfs",
+				"armazenamento.ntfs-last-access",
+				"sistema.storage-sense-on",
+				"rede.max-user-port",
+				"rede.tcp-timed-wait-delay",
+				"rede.thumbs-rede-off",
+				"visual.menu-show-delay",
+			},
+			DisableSleepAC:   true,
+			ServicesToEnsure: []string{"WSearch", "SysMain", "wslservice", "com.docker.service", "vmms"},
+		},
+	}
+}
+
+// ObterPerfilUso busca um perfil pela chave ("jogo" ou "coding").
+func ObterPerfilUso(key string) (UseProfile, bool) {
+	for _, p := range ListarPerfisUso() {
+		if p.Key == key {
+			return p, true
+		}
+	}
+	return UseProfile{}, false
+}

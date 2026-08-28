@@ -9,13 +9,13 @@ import (
 
 // DNSProvider representa um servidor DNS público conhecido.
 type DNSProvider struct {
-	Nome       string   `json:"nome"`
-	IPs        []string `json:"ips"`
-	DoHURL     string   `json:"dohUrl"`
+	Nome        string   `json:"nome"`
+	IPs         []string `json:"ips"`
+	DoHURL      string   `json:"dohUrl"`
 	Privacidade string   `json:"privacidade"` // "Sem Logs", "Segurança/Malware", "Padrão"
-	AvgRTT     int      `json:"avgRttMs"`
-	Perda      float64  `json:"perda"`
-	Recomendado bool    `json:"recomendado"`
+	AvgRTT      int      `json:"avgRttMs"`
+	Perda       float64  `json:"perda"`
+	Recomendado bool     `json:"recomendado"`
 }
 
 // ProvedoresPadrao lista os principais resolvedores DNS globais e seguros.
@@ -58,12 +58,12 @@ func BenchmarkDNS(ctx context.Context, hostsTeste []string) []DNSProvider {
 	for i := range provedores {
 		p := &provedores[i]
 		server := p.IPs[0] + ":53"
-		
+
 		var tempos []int
 		for _, host := range hostsTeste {
 			d := net.Dialer{Timeout: 800 * time.Millisecond}
 			inicio := time.Now()
-			
+
 			conn, err := d.DialContext(ctx, "udp", server)
 			if err != nil {
 				continue

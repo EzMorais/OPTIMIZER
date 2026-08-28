@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"optimizer/internal/history"
 	"optimizer/internal/tweak"
@@ -93,14 +94,25 @@ func (e *Engine) Recommended(profile tweak.Profile) []string {
 	return ids
 }
 
-// Apply aplica os IDs pedidos, em lote. Com dryRun a máquina não é tocada.
-//
-// Ordem por item: checar → pular se já aplicado → aplicar → verificar → gravar
-// no histórico. O histórico é gravado inclusive em falha, porque uma falha
-// parcial ainda pode ter deixado valores gravados que precisam ser desfeitos.
+// Apply aplica os IDs pedidos usando origem "manual".
 func (e *Engine) Apply(ctx context.Context, ids []string, dryRun bool) []Result {
+	return e.ApplyBatch(ctx, ids, dryRun, "manual", "")
+}
+
+// ApplyBatch aplica os IDs pedidos associando-os a uma transação/origem específica.
+// Em caso de falha crítica na gravação ou verificação, os itens aplicados até o momento
+// nesta transação são revertidos em ordem inversa (LIFO).
+func (e *Engine) ApplyBatch(ctx context.Context, ids []string, dryRun bool, origin, batchID string) []Result {
+	if batchID == "" {
+		batchID = fmt.Sprintf("batch-%d", time.Now().UnixNano())
+	}
+	if origin == "" {
+		origin = "manual"
+	}
+
 	results := make([]Result, 0, len(ids))
 	restorePointDone := false
+	var appliedInBatch []string
 
 	for _, id := range ids {
 		t, ok := e.Registry.Known(id)
@@ -134,8 +146,7 @@ func (e *Engine) Apply(ctx context.Context, ids []string, dryRun bool) []Result 
 		}
 
 		if !dryRun && !restorePointDone && e.CreateRestorePoint != nil {
-			// Um ponto de restauração por lote, nunca um por item.
-			if _, err := e.CreateRestorePoint("Optimizer — antes de aplicar otimizações"); err != nil {
+			if _, err := e.CreateRestorePoint("Optimizer — antes de aplicar lote " + batchID); err != nil {
 				res.Err = fmt.Errorf("não foi possível criar o ponto de restauração, nada foi alterado: %w", err)
 				results = append(results, res)
 				return results
@@ -171,6 +182,8 @@ func (e *Engine) Apply(ctx context.Context, ids []string, dryRun bool) []Result 
 			Detail:        res.Detail,
 			Snapshot:      applyRes.Snapshot,
 			RestartNeeded: applyRes.RestartNeeded,
+			BatchID:       batchID,
+			Origin:        origin,
 		}
 		if res.Err != nil {
 			entry.Error = res.Err.Error()
@@ -179,6 +192,83 @@ func (e *Engine) Apply(ctx context.Context, ids []string, dryRun bool) []Result 
 			res.Err = fmt.Errorf("alteração feita, mas o histórico não foi gravado: %w", err)
 		}
 
+		if res.Applied {
+			appliedInBatch = append(appliedInBatch, id)
+		} else if res.Err != nil && !dryRun && len(appliedInBatch) > 0 {
+			// Rollback atômico em ordem inversa em caso de falha crítica
+			for i := len(appliedInBatch) - 1; i >= 0; i-- {
+				rbID := appliedInBatch[i]
+				if prev, ok, _ := e.History.PendingFor(rbID); ok {
+					if rbTweak, ok := e.Registry.Known(rbID); ok {
+						_ = rbTweak.Revert(ctx, prev.Snapshot, false)
+						_, _ = e.History.Append(history.Entry{
+							TweakID: rbID,
+							Action:  history.ActionRevert,
+							Success: true,
+							Detail:  "Rollback automático de transação",
+							BatchID: batchID,
+							Origin:  origin,
+						})
+					}
+				}
+			}
+			res.Err = fmt.Errorf("falha crítica: %w (lote revertido com segurança)", res.Err)
+			results = append(results, res)
+			return results
+		}
+
+		results = append(results, res)
+	}
+	return results
+}
+
+// RevertBatch desfaz seletivamente apenas os itens ativos pertencentes a um lote específico.
+func (e *Engine) RevertBatch(ctx context.Context, batchID string, dryRun bool) []Result {
+	entries, err := e.History.PendingForBatch(batchID)
+	if err != nil || len(entries) == 0 {
+		return nil
+	}
+
+	results := make([]Result, 0, len(entries))
+	// Reversão em ordem LIFO (inversa)
+	for i := len(entries) - 1; i >= 0; i-- {
+		prev := entries[i]
+		id := prev.TweakID
+		t, ok := e.Registry.Known(id)
+		if !ok {
+			continue
+		}
+		meta, _ := e.Registry.Meta(id)
+		res := Result{ID: id, Name: meta.DisplayName, Action: history.ActionRevert}
+
+		if meta.RequiresAdmin && !e.Elevated {
+			res.Skipped = true
+			res.Reason = "precisa de permissão de administrador"
+			results = append(results, res)
+			continue
+		}
+
+		if err := t.Revert(ctx, prev.Snapshot, dryRun); err != nil {
+			res.Err = err
+		} else {
+			res.Applied = true
+			res.Detail = "Voltou ao estado anterior ao perfil."
+			res.RestartNeeded = prev.RestartNeeded
+		}
+
+		entry := history.Entry{
+			TweakID: id,
+			Action:  history.ActionRevert,
+			DryRun:  dryRun,
+			Success: res.Err == nil,
+			Detail:  res.Detail,
+			BatchID: batchID,
+			Origin:  prev.Origin,
+		}
+		if res.Err != nil {
+			entry.Error = res.Err.Error()
+		}
+		_, _ = e.History.Append(entry)
 		results = append(results, res)
 	}
 	return results

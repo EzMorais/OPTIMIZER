@@ -54,6 +54,11 @@ func TestRunPerfil(t *testing.T) {
 	cases := [][]string{
 		{"perfil"},
 		{"perfil", "listar"},
+		{"perfil", "aplicar", "jogo", "--simular"},
+		{"perfil", "aplicar", "coding", "--simular"},
+		{"perfil", "verificar", "jogo"},
+		{"perfil", "verificar", "coding"},
+		{"perfil", "restaurar", "jogo"},
 		{"perfil", "aplicar", "network-fast", "--simular"},
 		{"perfil", "aplicar", "network-dev", "--simular"},
 		{"perfil", "aplicar", "network-remote", "--simular"},

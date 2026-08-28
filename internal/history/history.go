@@ -46,6 +46,10 @@ type Entry struct {
 	// do lote, quando houve um.
 	RestorePoint  uint64 `json:"restorePoint,omitempty"`
 	RestartNeeded bool   `json:"restartNeeded,omitempty"`
+	// BatchID identifica a transação/lote desta alteração.
+	BatchID string `json:"batchId,omitempty"`
+	// Origin identifica se a ação foi manual ou por perfil (ex: "perfil-jogo", "perfil-coding").
+	Origin string `json:"origin,omitempty"`
 }
 
 // Store é o histórico em disco.
@@ -179,4 +183,36 @@ func (s *Store) PendingFor(tweakID string) (Entry, bool, error) {
 	}
 	e, ok := pending[tweakID]
 	return e, ok, nil
+}
+
+// PendingForBatch devolve todas as entradas ativas que pertencem a um lote específico.
+func (s *Store) PendingForBatch(batchID string) ([]Entry, error) {
+	pending, err := s.Pending()
+	if err != nil {
+		return nil, err
+	}
+	var out []Entry
+	for _, e := range pending {
+		if e.BatchID == batchID {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+
+// ActiveBatchForOrigin devolve o ID do último lote ativo para uma determinada origem (ex: "perfil-jogo").
+func (s *Store) ActiveBatchForOrigin(origin string) (string, []Entry, error) {
+	pending, err := s.Pending()
+	if err != nil {
+		return "", nil, err
+	}
+	var out []Entry
+	var lastBatchID string
+	for _, e := range pending {
+		if e.Origin == origin {
+			out = append(out, e)
+			lastBatchID = e.BatchID
+		}
+	}
+	return lastBatchID, out, nil
 }

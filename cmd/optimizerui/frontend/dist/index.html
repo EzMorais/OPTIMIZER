@@ -23,7 +23,7 @@
   </div>
 
   <div class="profile-switch-container">
-    <div class="profile-switch" role="tablist" aria-label="Perfil de uso">
+    <div class="profile-switch" role="tablist" aria-label="Perfil de catálogo">
       <button class="prof on" data-perfil="pessoal" id="prof-pessoal">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         Pessoal
@@ -49,22 +49,22 @@
 <!-- Navegação em Abas -->
 <nav class="main-nav">
   <div class="nav-tabs">
-    <button class="nav-tab on" data-view="otim" id="tab-otim">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
-      <span>Otimizações</span>
-      <span class="tab-badge" id="tab-badge-otim">0</span>
+    <button class="nav-tab on" data-view="perfis" id="tab-perfis">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <span>Perfis de Uso</span>
     </button>
-    <button class="nav-tab" data-view="startup" id="tab-startup">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      <span>Inicialização</span>
-    </button>
-    <button class="nav-tab" data-view="disco" id="tab-disco">
+    <button class="nav-tab" data-view="diag" id="tab-diag">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-      <span>Disco & Reparo</span>
+      <span>Diagnóstico</span>
+    </button>
+    <button class="nav-tab" data-view="otim" id="tab-otim">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+      <span>Ajustes Avançados</span>
+      <span class="tab-badge" id="tab-badge-otim">0</span>
     </button>
     <button class="nav-tab" data-view="rede" id="tab-rede">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-      <span>Internet & DNS</span>
+      <span>Internet & Rede</span>
     </button>
     <button class="nav-tab" data-view="hist" id="tab-hist">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -76,8 +76,196 @@
 <!-- Conteúdo Principal -->
 <main class="content-viewport">
 
-  <!-- ==================== ABA 1: OTIMIZAÇÕES (6 CATEGORIAS) ==================== -->
-  <section id="view-otim" class="view-panel on">
+  <!-- ==================== ABA 1: PERFIS DE USO (HOME) ==================== -->
+  <section id="view-perfis" class="view-panel on">
+    <div class="profiles-hero">
+      <h1 class="hero-title">Perfis Diretos de Otimização</h1>
+      <p class="hero-subtitle">Aplicação transacional e segura com rollback atômico. Ajustes manuais individuais nunca são afetados pela troca de perfil.</p>
+    </div>
+
+    <div class="use-profiles-grid">
+      
+      <!-- Card JOGO -->
+      <div class="use-profile-card" id="card-perfil-jogo">
+        <div class="profile-card-header">
+          <div class="profile-badge-icon jogo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4m-2-2v4"/><line x1="15" y1="11" x2="15" y2="11"/><line x1="18" y1="13" x2="18" y2="13"/></svg>
+          </div>
+          <span class="profile-status-badge" id="status-perfil-jogo">Inativo</span>
+        </div>
+        <h2 class="profile-title">JOGO</h2>
+        <p class="profile-tagline">FPS Máximo, Responsividade & Baixa Latência</p>
+        <p class="profile-objective">Ativa o plano de Alto Desempenho, suspensão na tomada desativada, prioridade de primeiro plano, MMCSS Games, otimizações de jogos em janela do Win11, HAGS e TCP NoDelay na rota padrão.</p>
+        
+        <div class="profile-meta-tags">
+          <span class="badge-tag rec">Energia</span>
+          <span class="badge-tag rec">Jogos</span>
+          <span class="badge-tag rec">Visual</span>
+          <span class="badge-tag rec">Rede</span>
+        </div>
+
+        <div class="profile-caveat">
+          <strong>Ressalva:</strong> Pausa temporária e reversível de indexação de busca (WSearch) e pré-carregamento (SysMain).
+        </div>
+
+        <div class="profile-card-actions">
+          <button class="btn-secondary small-btn btn-view-profile" data-profile="jogo">Visualizar</button>
+          <button class="btn-secondary small-btn btn-verify-profile" data-profile="jogo">Verificar</button>
+          <button class="btn-primary btn-apply-profile" data-profile="jogo" id="btn-apply-jogo">Aplicar Perfil</button>
+          <button class="btn-secondary small-btn btn-restore-profile" data-profile="jogo" id="btn-restore-jogo" hidden>Restaurar</button>
+        </div>
+      </div>
+
+      <!-- Card CODING -->
+      <div class="use-profile-card" id="card-perfil-coding">
+        <div class="profile-card-header">
+          <div class="profile-badge-icon coding">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <span class="profile-status-badge" id="status-perfil-coding">Inativo</span>
+        </div>
+        <h2 class="profile-title">CODING</h2>
+        <p class="profile-tagline">Compilação, IDEs, Docker/WSL & Sessões Longas</p>
+        <p class="profile-objective">Mantém suspensão na tomada desligada, suporte a caminhos longos (Long Paths 260+), carimbo de último acesso NTFS desativado e garante todos os serviços essenciais ativos.</p>
+        
+        <div class="profile-meta-tags">
+          <span class="badge-tag rec">Sistema</span>
+          <span class="badge-tag rec">Disco</span>
+          <span class="badge-tag rec">Rede</span>
+          <span class="badge-tag rec">Dev</span>
+        </div>
+
+        <div class="profile-caveat">
+          <strong>Ressalva:</strong> Nunca desabilita serviços. Retoma e preserva a indexação do Windows Search e serviços de virtualização.
+        </div>
+
+        <div class="profile-card-actions">
+          <button class="btn-secondary small-btn btn-view-profile" data-profile="coding">Visualizar</button>
+          <button class="btn-secondary small-btn btn-verify-profile" data-profile="coding">Verificar</button>
+          <button class="btn-primary btn-apply-profile" data-profile="coding" id="btn-apply-coding">Aplicar Perfil</button>
+          <button class="btn-secondary small-btn btn-restore-profile" data-profile="coding" id="btn-restore-coding" hidden>Restaurar</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==================== ABA 2: DIAGNÓSTICO & HARDWARE ==================== -->
+  <section id="view-diag" class="view-panel">
+    
+    <!-- Painel de CPU em Tempo Real -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon cpu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Métricas de Processador (CPU) em Tempo Real</h2>
+          <p class="card-subtitle">Leitura contínua enquanto esta aba estiver aberta. Dados reais obtidos diretamente dos contadores de desempenho nativos do Windows.</p>
+        </div>
+      </div>
+
+      <div class="cpu-monitor-grid" style="margin-top:16px;">
+        <div class="cpu-stat-box">
+          <span class="cpu-stat-num" id="cpu-total-val">0.0%</span>
+          <span class="cpu-stat-sub">Uso Total de CPU</span>
+          <div class="cpu-bar-bg" style="margin-top:8px;">
+            <div class="cpu-bar-fill" id="cpu-bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+        <div class="cpu-stat-box">
+          <span class="cpu-stat-num" id="cpu-cores-val">—</span>
+          <span class="cpu-stat-sub">Núcleos Físicos / Lógicos</span>
+          <div class="field-hint" style="margin-top:8px;" id="cpu-thermal-notice">Temperatura/Throttling: Não disponível neste hardware</div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <h4 style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:6px;">Processos Mais Consumidores:</h4>
+        <div class="terminal-block" id="cpu-top-processes">
+          <div>Lendo processos em execução…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gerenciador de Inicialização -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon startup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Programas na Inicialização</h2>
+          <p class="card-subtitle">Controle quais softwares iniciam automaticamente com o Windows para acelerar o boot.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-recarregar-startup">Recarregar</button>
+        </div>
+      </div>
+
+      <div class="startup-list" id="lista-startup" style="margin-top:16px;">
+        <p class="muted-text">Carregando programas de inicialização…</p>
+      </div>
+    </div>
+
+    <!-- Unidades de Disco & TRIM -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon disk">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Saúde das Unidades & TRIM Seguro</h2>
+          <p class="card-subtitle">Identificação inteligente de SSDs (TRIM) e HDDs (Desfragmentação) para maximizar a vida útil e velocidade de leitura.</p>
+        </div>
+      </div>
+
+      <div class="drives-grid" id="lista-drives" style="margin-top:16px;">
+        <p class="muted-text">Carregando informações de disco…</p>
+      </div>
+    </div>
+
+    <!-- Central de Reparo DISM / SFC -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon repair">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Central de Integridade de Sistema (DISM / SFC)</h2>
+          <p class="card-subtitle">Auditoria não-destrutiva de integridade via `DISM /CheckHealth` e `sfc /verifyonly` em modo somente leitura.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-auditar-reparo">Auditar Integridade</button>
+        </div>
+      </div>
+      <div id="reparo-resultado" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- Benchmark de DNS & DoH -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon dns">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Benchmark de DNS & Resolvedores DoH</h2>
+          <p class="card-subtitle">Mede o tempo real de resposta dos servidores DNS mais rápidos e seguros do mundo.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-testar-dns">Testar Servidores DNS</button>
+        </div>
+      </div>
+
+      <div id="dns-resultado" style="margin-top:16px;">
+        <p class="muted-text">Clique em "Testar Servidores DNS" para medir a velocidade de resolução.</p>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==================== ABA 3: AJUSTES AVANÇADOS (6 CATEGORIAS) ==================== -->
+  <section id="view-otim" class="view-panel">
 
     <!-- Card de Saúde e Status -->
     <div class="health-card" id="resumo">
@@ -122,94 +310,9 @@
     <div class="tweaks-container" id="lista"></div>
   </section>
 
-  <!-- ==================== ABA 2: INICIALIZAÇÃO & APPS ==================== -->
-  <section id="view-startup" class="view-panel">
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon startup">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Gerenciador de Programas na Inicialização</h2>
-          <p class="card-subtitle">Controle os softwares que iniciam automaticamente com o Windows para acelerar a inicialização do PC.</p>
-        </div>
-        <div class="header-actions">
-          <button class="btn-secondary small-btn" id="btn-recarregar-startup">Recarregar</button>
-        </div>
-      </div>
-
-      <div class="startup-list" id="lista-startup" style="margin-top:16px;">
-        <p class="muted-text">Carregando programas de inicialização…</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ==================== ABA 3: DISCO & REPARO ==================== -->
-  <section id="view-disco" class="view-panel">
-    
-    <!-- Diagnóstico de Unidades -->
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon disk">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Saúde das Unidades & TRIM Seguro</h2>
-          <p class="card-subtitle">Identificação inteligente de SSDs (TRIM) e HDDs (Desfragmentação) para maximizar a vida útil e velocidade de leitura.</p>
-        </div>
-      </div>
-
-      <div class="drives-grid" id="lista-drives" style="margin-top:16px;">
-        <p class="muted-text">Carregando informações de disco…</p>
-      </div>
-    </div>
-
-    <!-- Central de Reparo DISM / SFC -->
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon repair">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Central de Diagnóstico & Integridade de Sistema</h2>
-          <p class="card-subtitle">Auditoria não-destrutiva de integridade via DISM e SFC (Verificação de arquivos protegidos sem alterações cegas).</p>
-        </div>
-      </div>
-
-      <div class="action-inline-form" style="margin-top:14px;">
-        <button class="btn-primary" id="btn-auditar-reparo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
-          Auditar Integridade do Windows
-        </button>
-      </div>
-      <p class="field-hint">Executa `DISM /CheckHealth` e `sfc /verifyonly` em modo somente leitura.</p>
-      <div id="reparo-resultado" style="margin-top:14px;"></div>
-    </div>
-  </section>
-
-  <!-- ==================== ABA 4: INTERNET & DNS ==================== -->
+  <!-- ==================== ABA 4: INTERNET & REDE ==================== -->
   <section id="view-rede" class="view-panel">
     
-    <!-- Benchmark de DNS & DoH -->
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon dns">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Benchmark de DNS & Suporte DoH (DNS-over-HTTPS)</h2>
-          <p class="card-subtitle">Mede o tempo real de resposta dos servidores DNS mais rápidos e seguros do mundo.</p>
-        </div>
-        <div class="header-actions">
-          <button class="btn-secondary small-btn" id="btn-testar-dns">Testar Servidores DNS</button>
-        </div>
-      </div>
-
-      <div id="dns-resultado" style="margin-top:16px;">
-        <p class="muted-text">Clique em "Testar Servidores DNS" para medir a velocidade de resolução.</p>
-      </div>
-    </div>
-
     <!-- Teste de MTU -->
     <div class="glass-card">
       <div class="card-header">
@@ -237,7 +340,34 @@
       <div id="mtu-resultado"></div>
     </div>
 
-    <!-- Perfis de Rede Prontos -->
+    <!-- Comparador de Latência Antes/Depois -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon latency">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Comparador de Latência & Estabilidade</h2>
+          <p class="card-subtitle">Mede e compara o ping (mínimo, médio, máximo e desvio-padrão) antes e depois de aplicar alterações.</p>
+        </div>
+      </div>
+
+      <div class="latency-grid">
+        <div class="latency-card">
+          <div class="lat-label">Medição ANTERIOR</div>
+          <div class="lat-val" id="lat-antes-val">—</div>
+          <button class="btn-secondary small-btn" id="btn-medir-antes">Gravar Como "Antes"</button>
+        </div>
+        <div class="latency-card">
+          <div class="lat-label">Medição ATUAL</div>
+          <div class="lat-val" id="lat-depois-val">—</div>
+          <button class="btn-secondary small-btn" id="btn-medir-depois">Medir Agora</button>
+        </div>
+      </div>
+      <div id="comparativo-resultado" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- Perfis Granulares de Rede -->
     <div class="glass-card">
       <div class="card-header">
         <div class="card-header-icon profile">
@@ -248,94 +378,57 @@
           <p class="card-subtitle">Conjuntos balanceados para cenários específicos com reversão transparente e ressalvas honestas.</p>
         </div>
       </div>
-      
-      <div class="profiles-grid" id="lista-perfis">
+
+      <div class="net-profiles-grid" id="perfis-lista">
         <p class="muted-text">Carregando perfis de rede…</p>
       </div>
     </div>
 
-    <!-- Medição e Comparativo de Latência -->
-    <div class="glass-card">
-      <div class="card-header">
-        <div class="card-header-icon speed">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 8 14"/></svg>
-        </div>
-        <div>
-          <h2 class="card-title">Comparador de Latência & Jitter (Antes vs Depois)</h2>
-          <p class="card-subtitle">Realize medições precisas antes e após aplicar ajustes para constatar o ganho real de tempo de resposta.</p>
-        </div>
-      </div>
-
-      <div class="action-inline-form">
-        <div class="input-with-label">
-          <label for="destino-latencia">Host de teste</label>
-          <input id="destino-latencia" type="text" value="1.1.1.1" spellcheck="false">
-        </div>
-        <div class="btn-group">
-          <button class="btn-secondary" id="btn-medir-antes">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            1. Medir Antes
-          </button>
-          <button class="btn-secondary" id="btn-medir-depois" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            2. Medir Depois
-          </button>
-        </div>
-      </div>
-      <p class="field-hint">Envia 20 pacotes ICMP controlados com estatísticas completas de RTT médio, mínimo, máximo e desvio padrão.</p>
-
-      <div id="latencia-resultado"></div>
-    </div>
   </section>
 
-  <!-- ==================== ABA 5: HISTÓRICO ==================== -->
+  <!-- ==================== ABA 5: HISTÓRICO & AUDITORIA ==================== -->
   <section id="view-hist" class="view-panel">
     <div class="glass-card">
       <div class="card-header">
-        <div class="card-header-icon hist">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <div class="card-header-icon history">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
         <div>
-          <h2 class="card-title">Linha do Tempo de Alterações</h2>
-          <p class="card-subtitle">Auditoria completa de cada valor modificado no sistema, gravado em formato append-only JSONL legível.</p>
+          <h2 class="card-title">Linha do Tempo de Alterações & Lotes</h2>
+          <p class="card-subtitle">Auditoria completa gravada em disco (`%LOCALAPPDATA%\Optimizer\history.jsonl`).</p>
         </div>
         <div class="header-actions">
-          <button class="btn-secondary small-btn" id="btn-abrir-hist">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            Abrir arquivo JSONL
-          </button>
+          <button class="btn-secondary small-btn" id="btn-abrir-hist">Abrir Arquivo</button>
         </div>
       </div>
-      <p class="filepath-tag" id="hist-caminho"></p>
 
-      <div class="timeline-container" id="hist-lista"></div>
+      <div class="timeline" id="hist-lista">
+        <p class="muted-text">Carregando histórico…</p>
+      </div>
     </div>
   </section>
 
 </main>
 
-<!-- Barra Flutuante de Ações (Dock) -->
-<div class="floating-dock-wrap" id="barra">
-  <div class="floating-dock">
-    <div class="dock-left">
-      <div class="dock-badge" id="selected-badge">
-        <span class="dock-badge-num" id="selected-count">0</span>
-        <span class="dock-badge-text" id="selected-label">selecionados</span>
+<!-- Barra Inferior de Ações (Dock Fixo para Ajustes Avançados) -->
+<div class="action-dock" id="barra" style="display:none;">
+  <div class="dock-container">
+    <div class="dock-info">
+      <div class="dock-title">
+        <span id="selecionados-count">0</span> otimizações selecionadas
       </div>
-      <label class="dock-checkbox" id="wrap-restauracao" title="Cria um ponto seguro via SrClient.dll antes de aplicar qualquer alteração">
-        <input type="checkbox" id="ponto-restauracao" checked>
-        <span class="dock-checkbox-custom"></span>
-        <span>Criar Ponto de Restauração</span>
-      </label>
+      <div class="dock-sub" id="selecionados-sub">
+        Nenhum item alterado pendente de aplicação
+      </div>
     </div>
 
-    <div class="dock-right">
-      <button class="dock-btn secondary" id="btn-recomendados" title="Marcar todos os ajustes seguros de alto ganho">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    <div class="dock-actions">
+      <button class="dock-btn outline" id="btn-recomendados" title="Marcar automaticamente apenas ajustes seguros e recomendados">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         Recomendados
       </button>
-      <button class="dock-btn outline" id="btn-simular" title="Testar e auditar alterações sem gravar nada no registro">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+      <button class="dock-btn secondary" id="btn-simular" disabled title="Verificar o que seria gravado sem fazer nenhuma alteração no Windows">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
         Simular
       </button>
       <button class="dock-btn primary" id="btn-aplicar" disabled title="Gravar alterações selecionadas com snapshot e backup">

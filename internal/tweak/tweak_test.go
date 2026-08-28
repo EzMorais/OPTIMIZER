@@ -15,12 +15,12 @@ type dummyTweak struct {
 	risk tweak.Risk
 }
 
-func (d dummyTweak) ID() string                        { return d.id }
-func (d dummyTweak) Name() string                      { return d.name }
-func (d dummyTweak) Description() string               { return d.desc }
-func (d dummyTweak) Category() tweak.Category          { return d.cat }
-func (d dummyTweak) Risk() tweak.Risk                  { return d.risk }
-func (d dummyTweak) RequiresRestart() bool             { return false }
+func (d dummyTweak) ID() string               { return d.id }
+func (d dummyTweak) Name() string             { return d.name }
+func (d dummyTweak) Description() string      { return d.desc }
+func (d dummyTweak) Category() tweak.Category { return d.cat }
+func (d dummyTweak) Risk() tweak.Risk         { return d.risk }
+func (d dummyTweak) RequiresRestart() bool    { return false }
 func (d dummyTweak) Check(ctx context.Context) (tweak.CheckResult, error) {
 	return tweak.CheckResult{State: tweak.StateNotApplied}, nil
 }
@@ -66,9 +66,9 @@ func TestRegistryBasic(t *testing.T) {
 
 func TestParseProfile(t *testing.T) {
 	cases := []struct {
-		in      string
-		want    tweak.Profile
-		wantOk  bool
+		in     string
+		want   tweak.Profile
+		wantOk bool
 	}{
 		{"pessoal", tweak.ProfilePersonal, true},
 		{"personal", tweak.ProfilePersonal, true},

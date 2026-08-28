@@ -11,36 +11,36 @@ import (
 
 // LatencyReport contém estatísticas de latência de um host.
 type LatencyReport struct {
-	Host       string `json:"host"`
-	MinRTT     int    `json:"min_rtt_ms"`
-	AvgRTT     int    `json:"avg_rtt_ms"`
-	MaxRTT     int    `json:"max_rtt_ms"`
-	StdDev     int    `json:"stddev_ms"`
+	Host        string `json:"host"`
+	MinRTT      int    `json:"min_rtt_ms"`
+	AvgRTT      int    `json:"avg_rtt_ms"`
+	MaxRTT      int    `json:"max_rtt_ms"`
+	StdDev      int    `json:"stddev_ms"`
 	PacketsLost int    `json:"packets_lost"`
 	PacketsSent int    `json:"packets_sent"`
 }
 
 // Benchmark contém todas as métricas de desempenho de rede capturadas antes/depois de um ajuste.
 type Benchmark struct {
-	Timestamp   time.Time     `json:"timestamp"`
-	Host        string        `json:"host"`
-	Latency     LatencyReport `json:"latency"`
-	Jitter      int           `json:"jitter_ms"` // stddev da latência
-	Loss        float64       `json:"loss_percent"`
-	CPUUsage    float64       `json:"cpu_usage_percent,omitempty"`
-	NetworkBW   float64       `json:"network_bw_mbps,omitempty"`
-	TCPErrors   uint64        `json:"tcp_errors,omitempty"`
+	Timestamp time.Time     `json:"timestamp"`
+	Host      string        `json:"host"`
+	Latency   LatencyReport `json:"latency"`
+	Jitter    int           `json:"jitter_ms"` // stddev da latência
+	Loss      float64       `json:"loss_percent"`
+	CPUUsage  float64       `json:"cpu_usage_percent,omitempty"`
+	NetworkBW float64       `json:"network_bw_mbps,omitempty"`
+	TCPErrors uint64        `json:"tcp_errors,omitempty"`
 }
 
 // BenchmarkDelta compara dois benchmarks e computa a diferença.
 type BenchmarkDelta struct {
-	Before              Benchmark  `json:"before"`
-	After               Benchmark  `json:"after"`
-	LatencyDeltaPercent float64    `json:"latency_delta_percent"` // (after.AvgRTT - before.AvgRTT) / before.AvgRTT * 100
+	Before               Benchmark `json:"before"`
+	After                Benchmark `json:"after"`
+	LatencyDeltaPercent  float64   `json:"latency_delta_percent"` // (after.AvgRTT - before.AvgRTT) / before.AvgRTT * 100
 	LatencyAbsoluteDelta int       `json:"latency_absolute_delta_ms"`
-	JitterDeltaPercent  float64    `json:"jitter_delta_percent"`
-	LossDeltaPercent    float64    `json:"loss_delta_percent"`
-	Interpretation      string    `json:"interpretation"`
+	JitterDeltaPercent   float64   `json:"jitter_delta_percent"`
+	LossDeltaPercent     float64   `json:"loss_delta_percent"`
+	Interpretation       string    `json:"interpretation"`
 }
 
 // MeasureLatencyFromRTTs executa um benchmark de latência contra um host, usando RTTs fornecidos.

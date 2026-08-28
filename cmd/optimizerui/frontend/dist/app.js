@@ -209,6 +209,7 @@ async function boot() {
   App = window.go.main.App;
   Visualizer.init();
   ligarEventos();
+  await carregarEstadoPerfis();
   await diagnosticar();
 }
 
@@ -276,19 +277,41 @@ function ligarEventos() {
     await diagnosticar();
   }));
 
+  let cpuTimer = null;
   $$(".nav-tab").forEach((tab) => tab.addEventListener("click", () => {
     $$(".nav-tab").forEach((x) => x.classList.toggle("on", x === tab));
     $$(".view-panel").forEach((v) => v.classList.remove("on"));
     const viewId = tab.dataset.view;
-    $("#view-" + viewId).classList.add("on");
+    const viewEl = $("#view-" + viewId);
+    if (viewEl) viewEl.classList.add("on");
     
     $("#barra").style.display = viewId === "otim" ? "flex" : "none";
 
-    if (viewId === "startup") carregarStartup();
-    if (viewId === "disco") carregarDiscos();
+    // Interrompe o polling de CPU se o usuário sair da aba Diagnóstico
+    if (viewId !== "diag" && cpuTimer) {
+      clearInterval(cpuTimer);
+      cpuTimer = null;
+    }
+
+    if (viewId === "perfis") carregarEstadoPerfis();
+    if (viewId === "diag") {
+      carregarStartup();
+      carregarDiscos();
+      atualizarMetricasCPU();
+      if (!cpuTimer) cpuTimer = setInterval(atualizarMetricasCPU, 1500);
+    }
+    if (viewId === "otim") {
+      if (!itens.length) diagnosticar();
+    }
     if (viewId === "hist") carregarHistorico();
     if (viewId === "rede") carregarPerfis();
   }));
+
+  // Listeners de Perfis de Uso
+  $$(".btn-view-profile").forEach((b) => b.addEventListener("click", () => visualizarPerfil(b.dataset.profile)));
+  $$(".btn-verify-profile").forEach((b) => b.addEventListener("click", () => verificarPerfil(b.dataset.profile)));
+  $$(".btn-apply-profile").forEach((b) => b.addEventListener("click", () => aplicarPerfilUso(b.dataset.profile)));
+  $$(".btn-restore-profile").forEach((b) => b.addEventListener("click", () => restaurarPerfilUso(b.dataset.profile)));
 
   const btnRecarregarStartup = $("#btn-recarregar-startup");
   if (btnRecarregarStartup) btnRecarregarStartup.addEventListener("click", carregarStartup);
@@ -1194,6 +1217,187 @@ async function testarDNS() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = "Testar Servidores DNS";
+  }
+}
+
+/* ==========================================================================
+   Perfis de Uso (private-optimizer JOGO / CODING)
+   ========================================================================== */
+
+let listaPerfisUso = [];
+
+async function carregarEstadoPerfis() {
+  try {
+    listaPerfisUso = await App.ListarPerfisUso();
+    const ativo = await App.ObterPerfilAtivo();
+
+    ["jogo", "coding"].forEach((key) => {
+      const card = $("#card-perfil-" + key);
+      const badge = $("#status-perfil-" + key);
+      const btnApply = $("#btn-apply-" + key);
+      const btnRestore = $("#btn-restore-" + key);
+      const isAtivo = (ativo === key);
+
+      if (card) card.classList.toggle("active-profile", isAtivo);
+      if (badge) {
+        badge.textContent = isAtivo ? "Ativo" : "Inativo";
+        badge.classList.toggle("active", isAtivo);
+      }
+      if (btnApply) {
+        btnApply.textContent = isAtivo ? "Reaplicar Perfil" : "Aplicar Perfil";
+      }
+      if (btnRestore) {
+        btnRestore.hidden = !isAtivo;
+      }
+    });
+  } catch (e) {
+    console.error("Erro ao carregar estado de perfis:", e);
+  }
+}
+
+async function visualizarPerfil(key) {
+  const p = (listaPerfisUso || []).find((x) => x.key === key);
+  if (!p) return;
+
+  const html = `
+    <div style="margin-bottom: 12px;">
+      <p style="margin-bottom:8px; color:var(--text-secondary);">${esc(p.descricao)}</p>
+      <h4 style="font-size:13px; font-weight:700; margin:12px 0 6px 0;">Ajustes que compõem este perfil (${p.tweakIds.length} itens):</h4>
+      <div class="terminal-block" style="max-height:220px; overflow-y:auto;">
+        ${p.tweakIds.map((id) => `<div>• <b>${esc(id)}</b></div>`).join("")}
+      </div>
+      <div style="margin-top:12px;" class="field-hint">${esc(p.ressalvas)}</div>
+    </div>
+  `;
+  abrirModal(`Composição do Perfil: ${p.nome}`, html);
+}
+
+async function verificarPerfil(key) {
+  const p = (listaPerfisUso || []).find((x) => x.key === key);
+  if (!p) return;
+
+  Visualizer.show();
+  Visualizer.log({ type: "read", msg: `Verificando integridade das chaves do perfil ${key.toUpperCase()}...` });
+
+  let auditHtml = `<div class="health-loading"><span class="pulse-spinner"></span><span>Auditando integridade do perfil…</span></div>`;
+  abrirModal(`Integridade: ${p.nome}`, auditHtml);
+
+  try {
+    const diag = await App.Diagnosticar("pessoal");
+    const mapaItens = new Map((diag.itens || []).map((it) => [it.meta.id, it]));
+
+    const linhas = p.tweakIds.map((id) => {
+      const it = mapaItens.get(id);
+      const isApplied = it && it.state === "applied";
+      const icon = isApplied ? '<span style="color:var(--accent); font-weight:bold;">[OK]</span>' : '<span style="color:var(--text-muted);">[PENDENTE]</span>';
+      return `<div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12px;">
+        <span>${icon} <b>${esc(it ? it.meta.displayName : id)}</b></span>
+        <span class="muted">${esc(it ? it.detail : '')}</span>
+      </div>`;
+    }).join("");
+
+    $("#modal-corpo").innerHTML = `
+      <div style="margin-bottom:10px;">
+        <p style="margin-bottom:10px; font-size:13px; color:var(--text-secondary);">Estado atual de cada otimização no Windows:</p>
+        <div class="terminal-block" style="max-height:300px; overflow-y:auto;">${linhas}</div>
+      </div>
+    `;
+  } catch (e) {
+    $("#modal-corpo").innerHTML = `<p class="muted">Erro na verificação: ${esc(String(e))}</p>`;
+  }
+}
+
+async function aplicarPerfilUso(key) {
+  const p = (listaPerfisUso || []).find((x) => x.key === key);
+  if (!p) return;
+
+  const html = `
+    <div style="margin-bottom:14px;">
+      <p style="font-size:14px; color:var(--text-primary); margin-bottom:8px;">Deseja aplicar o perfil <b>${esc(p.nome)}</b>?</p>
+      <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">Esta ação será registrada em lote de transação no histórico com backup completo do estado anterior.</p>
+      <div class="profile-caveat" style="margin-bottom:16px;">
+        <strong>Aviso:</strong> ${esc(p.ressalvas)}
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="btn-secondary" id="btn-modal-cancelar">Cancelar</button>
+        <button class="btn-primary" id="btn-modal-confirmar-aplicar">Confirmar e Aplicar</button>
+      </div>
+    </div>
+  `;
+  abrirModal(`Confirmar Aplicação de Perfil`, html);
+
+  $("#btn-modal-cancelar").addEventListener("click", fecharModal);
+  $("#btn-modal-confirmar-aplicar").addEventListener("click", async () => {
+    fecharModal();
+    Visualizer.show();
+    Visualizer.log({ type: "write", msg: `Iniciando transação do perfil [${key.toUpperCase()}] com snapshot prévio...` });
+
+    toast(`Aplicando perfil ${p.nome}…`, "info");
+    const res = await App.AplicarPerfilUso(key, false);
+
+    for (const r of (res || [])) {
+      Visualizer.log({
+        type: r.estado === "ok" ? "write" : (r.estado === "pulado" ? "read" : "fail"),
+        msg: `[${r.estado.toUpperCase()}] ${r.nome}: ${r.mensagem}`
+      });
+    }
+
+    toast(`Perfil ${p.nome} aplicado com sucesso!`, "ok");
+    await carregarEstadoPerfis();
+    await diagnosticar();
+  });
+}
+
+async function restaurarPerfilUso(key) {
+  Visualizer.show();
+  Visualizer.log({ type: "revert", msg: `Revertendo lote de transação ativo do perfil [${key.toUpperCase()}]...` });
+
+  toast("Restaurando estado anterior ao perfil…", "info");
+  const res = await App.RestaurarPerfilUso(key);
+
+  for (const r of (res || [])) {
+    Visualizer.log({
+      type: r.estado === "ok" ? "revert" : "fail",
+      msg: `[RESTAURADO] ${r.nome}: ${r.mensagem}`
+    });
+  }
+
+  toast("Perfil restaurado com sucesso.", "ok");
+  await carregarEstadoPerfis();
+  await diagnosticar();
+}
+
+/* ==========================================================================
+   Métricas de CPU em Tempo Real (Aba Diagnóstico)
+   ========================================================================== */
+
+async function atualizarMetricasCPU() {
+  try {
+    const info = await App.ObterMetricasCPU();
+    if (!info) return;
+
+    const totalValEl = $("#cpu-total-val");
+    const barFillEl = $("#cpu-bar-fill");
+    const coresValEl = $("#cpu-cores-val");
+    const procsEl = $("#cpu-top-processes");
+
+    if (totalValEl) totalValEl.textContent = `${info.totalUsagePercent.toFixed(1)}%`;
+    if (barFillEl) {
+      barFillEl.style.width = `${Math.min(100, Math.max(0, info.totalUsagePercent))}%`;
+      barFillEl.style.background = info.totalUsagePercent > 80 ? 'var(--danger)' : (info.totalUsagePercent > 50 ? 'var(--warn)' : 'var(--accent)');
+    }
+    if (coresValEl) coresValEl.textContent = `${info.physicalCores} Físicos / ${info.logicalProcessors} Lógicos`;
+
+    if (procsEl && info.topProcesses && info.topProcesses.length) {
+      procsEl.innerHTML = info.topProcesses.map((p) => `
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12px;">
+          <span>• <b>${esc(p.name)}</b> (PID: ${p.pid})</span>
+          <span class="mono"><b>${p.cpuPercent.toFixed(1)}s</b> CPU acumulada</span>
+        </div>
+      `).join("");
+    }
+  } catch (e) {
+    // Polling silencioso
   }
 }
 

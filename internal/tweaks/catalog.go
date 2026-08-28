@@ -50,18 +50,18 @@ func atMost(limit int) func(any) bool {
 }
 
 const (
-	pathDesktop       = `Control Panel\Desktop`
-	pathWindowMetrics = `Control Panel\Desktop\WindowMetrics`
-	pathMouse         = `Control Panel\Mouse`
-	pathPersonalize   = `Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`
-	pathExplorerAdv   = `Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced`
-	pathGameConfig    = `System\GameConfigStore`
-	pathMMCSS         = `SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`
-	pathDeliveryOpt     = `SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization`
-	pathGameDVRPolicy   = `SOFTWARE\Policies\Microsoft\Windows\GameDVR`
-	pathTcpip           = `SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`
-	pathGraphicsDrivers = `SYSTEM\CurrentControlSet\Control\GraphicsDrivers`
-	pathGameBar         = `Software\Microsoft\GameBar`
+	pathDesktop             = `Control Panel\Desktop`
+	pathWindowMetrics       = `Control Panel\Desktop\WindowMetrics`
+	pathMouse               = `Control Panel\Mouse`
+	pathPersonalize         = `Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`
+	pathExplorerAdv         = `Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced`
+	pathGameConfig          = `System\GameConfigStore`
+	pathMMCSS               = `SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`
+	pathDeliveryOpt         = `SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization`
+	pathGameDVRPolicy       = `SOFTWARE\Policies\Microsoft\Windows\GameDVR`
+	pathTcpip               = `SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`
+	pathGraphicsDrivers     = `SYSTEM\CurrentControlSet\Control\GraphicsDrivers`
+	pathGameBar             = `Software\Microsoft\GameBar`
 	pathFileSystem          = `SYSTEM\CurrentControlSet\Control\FileSystem`
 	pathSearchPolicy        = `SOFTWARE\Policies\Microsoft\Windows\Windows Search`
 	pathExplorerPolicy      = `Software\Policies\Microsoft\Windows\Explorer`
@@ -99,9 +99,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "armazenamento.trim-ntfs",
-				DisplayName: "Ativar TRIM para SSDs (manutenção de velocidade e vida útil)",
-				Explanation: "Garante que o comando TRIM esteja habilitado no sistema de arquivos, informando ao SSD quais blocos de dados não estão mais em uso para manter alta velocidade de gravação contínua.",
+				TweakID:        "armazenamento.trim-ntfs",
+				DisplayName:    "Ativar TRIM para SSDs (manutenção de velocidade e vida útil)",
+				Explanation:    "Garante que o comando TRIM esteja habilitado no sistema de arquivos, informando ao SSD quais blocos de dados não estão mais em uso para manter alta velocidade de gravação contínua.",
 				Cat:            tweak.CategoryStorage,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   false,
@@ -145,9 +145,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "jogos.game-mode",
-				DisplayName: "Modo de Jogo do Windows",
-				Explanation: "Garante que o Modo de Jogo esteja ativo para priorizar recursos de CPU e suprimir notificações e tarefas pesadas de fundo durante os jogos.",
+				TweakID:        "jogos.game-mode",
+				DisplayName:    "Modo de Jogo do Windows",
+				Explanation:    "Garante que o Modo de Jogo esteja ativo para priorizar recursos de CPU e suprimir notificações e tarefas pesadas de fundo durante os jogos.",
 				Cat:            tweak.CategoryGaming,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   false,
@@ -167,9 +167,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "visual.hags",
-				DisplayName: "Agendamento de GPU acelerado por hardware (HAGS)",
-				Explanation: "Permite que a placa de vídeo gerencie sua própria memória de vídeo diretamente, reduzindo latência em jogos e habilitando tecnologias como DLSS Frame Generation.",
+				TweakID:        "visual.hags",
+				DisplayName:    "Agendamento de GPU acelerado por hardware (HAGS)",
+				Explanation:    "Permite que a placa de vídeo gerencie sua própria memória de vídeo diretamente, reduzindo latência em jogos e habilitando tecnologias como DLSS Frame Generation.",
 				Cat:            tweak.CategoryVisualEffects,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   true,
@@ -212,9 +212,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "sistema.search-sem-bing",
-				DisplayName: "Pesquisa do Menu Iniciar sem resultados da web (Bing)",
-				Explanation: "Faz a pesquisa do Menu Iniciar buscar somente programas e arquivos locais no computador, sem gastar conexão nem exibir sugestões e notícias da web.",
+				TweakID:        "sistema.search-sem-bing",
+				DisplayName:    "Pesquisa do Menu Iniciar sem resultados da web (Bing)",
+				Explanation:    "Faz a pesquisa do Menu Iniciar buscar somente programas e arquivos locais no computador, sem gastar conexão nem exibir sugestões e notícias da web.",
 				Cat:            tweak.CategorySystem,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   true,
@@ -329,9 +329,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "rede.thumbs-rede-off",
-				DisplayName: "Não criar arquivos thumbs.db em pastas de rede",
-				Explanation: "Impede o Windows de criar e travar arquivos ocultos de miniaturas em compartilhamentos de rede, facilitando operações de renomear e excluir pastas remotas.",
+				TweakID:        "rede.thumbs-rede-off",
+				DisplayName:    "Não criar arquivos thumbs.db em pastas de rede",
+				Explanation:    "Impede o Windows de criar e travar arquivos ocultos de miniaturas em compartilhamentos de rede, facilitando operações de renomear e excluir pastas remotas.",
 				Cat:            tweak.CategoryNetwork,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   true,
@@ -475,9 +475,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "visual.anim-controles",
-				DisplayName: "Desativar animações de controles e elementos dentro das janelas",
-				Explanation: "Remove animações e transições internas de caixas de diálogo, listas e controles de janelas para respostas visuais instantâneas.",
+				TweakID:        "visual.anim-controles",
+				DisplayName:    "Desativar animações de controles e elementos dentro das janelas",
+				Explanation:    "Remove animações e transições internas de caixas de diálogo, listas e controles de janelas para respostas visuais instantâneas.",
 				Cat:            tweak.CategoryVisualEffects,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   true,
@@ -497,9 +497,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "visual.fade-menus",
-				DisplayName: "Desativar transição suave e rolagem lenta de menus (Smooth Scroll)",
-				Explanation: "Desativa o efeito de esmaecimento (fade/slide) e rolagem suave de menus e caixas de ferramentas.",
+				TweakID:        "visual.fade-menus",
+				DisplayName:    "Desativar transição suave e rolagem lenta de menus (Smooth Scroll)",
+				Explanation:    "Desativa o efeito de esmaecimento (fade/slide) e rolagem suave de menus e caixas de ferramentas.",
 				Cat:            tweak.CategoryVisualEffects,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   true,
@@ -519,9 +519,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "visual.sombras-janelas",
-				DisplayName: "Desativar sombras sob janelas e ícones",
-				Explanation: "Remove o efeito de sombra projetada sob as janelas e rótulos de ícones da área de trabalho, poupando composição gráfica.",
+				TweakID:        "visual.sombras-janelas",
+				DisplayName:    "Desativar sombras sob janelas e ícones",
+				Explanation:    "Remove o efeito de sombra projetada sob as janelas e rótulos de ícones da área de trabalho, poupando composição gráfica.",
 				Cat:            tweak.CategoryVisualEffects,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   true,
@@ -541,9 +541,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "visual.rastros-mouse",
-				DisplayName: "Garantir rastros do ponteiro do mouse desativados",
-				Explanation: "Garante que o rastro visual do ponteiro do mouse esteja completamente desligado para evitar interferência visual em jogos e precisão gráfica.",
+				TweakID:        "visual.rastros-mouse",
+				DisplayName:    "Garantir rastros do ponteiro do mouse desativados",
+				Explanation:    "Garante que o rastro visual do ponteiro do mouse esteja completamente desligado para evitar interferência visual em jogos e precisão gráfica.",
 				Cat:            tweak.CategoryVisualEffects,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   false,
@@ -563,9 +563,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "jogos.windowed-optimizations",
-				DisplayName: "Ativar otimizações para jogos em modo janela (Windows 11)",
-				Explanation: "Habilita o modelo moderno de apresentação de flip para jogos em janela e sem borda (DX10/DX11), reduzindo latência de frame e permitindo Auto HDR e taxa de atualização variável.",
+				TweakID:        "jogos.windowed-optimizations",
+				DisplayName:    "Ativar otimizações para jogos em modo janela (Windows 11)",
+				Explanation:    "Habilita o modelo moderno de apresentação de flip para jogos em janela e sem borda (DX10/DX11), reduzindo latência de frame e permitindo Auto HDR e taxa de atualização variável.",
 				Cat:            tweak.CategoryGaming,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   false,
@@ -586,9 +586,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "sistema.background-apps-off",
-				DisplayName: "Desativar execução de aplicativos padrão em segundo plano",
-				Explanation: "Impede que aplicativos UWP empacotados continuem rodando silenciosamente e consumindo ciclos de CPU e RAM quando fechados.",
+				TweakID:        "sistema.background-apps-off",
+				DisplayName:    "Desativar execução de aplicativos padrão em segundo plano",
+				Explanation:    "Impede que aplicativos UWP empacotados continuem rodando silenciosamente e consumindo ciclos de CPU e RAM quando fechados.",
 				Cat:            tweak.CategorySystem,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   false,
@@ -608,9 +608,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "sistema.storage-sense-on",
-				DisplayName: "Ativar Sensor de Armazenamento (Storage Sense automático)",
-				Explanation: "Ativa a rotina oficial do Windows para liberar automaticamente espaço em disco excluindo arquivos temporários desnecessários.",
+				TweakID:        "sistema.storage-sense-on",
+				DisplayName:    "Ativar Sensor de Armazenamento (Storage Sense automático)",
+				Explanation:    "Ativa a rotina oficial do Windows para liberar automaticamente espaço em disco excluindo arquivos temporários desnecessários.",
 				Cat:            tweak.CategoryStorage,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   false,
@@ -630,9 +630,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "entrada.sticky-keys-off",
-				DisplayName: "Desativar atalho de Teclas de Aderência (Sticky Keys ao pressionar Shift 5x)",
-				Explanation: "Desativa o popup que interrompe jogos em tela cheia quando a tecla Shift é pressionada cinco vezes consecutivas.",
+				TweakID:        "entrada.sticky-keys-off",
+				DisplayName:    "Desativar atalho de Teclas de Aderência (Sticky Keys ao pressionar Shift 5x)",
+				Explanation:    "Desativa o popup que interrompe jogos em tela cheia quando a tecla Shift é pressionada cinco vezes consecutivas.",
 				Cat:            tweak.CategoryInput,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   false,
@@ -652,9 +652,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "entrada.toggle-keys-off",
-				DisplayName: "Desativar atalho de Teclas de Alternância (Toggle Keys ao segurar NumLock)",
-				Explanation: "Desativa o bip e aviso sonoro ao segurar a tecla NumLock por 5 segundos.",
+				TweakID:        "entrada.toggle-keys-off",
+				DisplayName:    "Desativar atalho de Teclas de Alternância (Toggle Keys ao segurar NumLock)",
+				Explanation:    "Desativa o bip e aviso sonoro ao segurar a tecla NumLock por 5 segundos.",
 				Cat:            tweak.CategoryInput,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   false,
@@ -674,9 +674,9 @@ func entries() []entry {
 		},
 		{
 			spec: regtweak.Spec{
-				TweakID:     "entrada.filter-keys-off",
-				DisplayName: "Desativar atalho de Teclas de Filtragem (Filter Keys ao segurar Shift)",
-				Explanation: "Impede o travamento de repetição de teclas ao segurar a tecla Shift direita por 8 segundos durante jogos ou digitação rápida.",
+				TweakID:        "entrada.filter-keys-off",
+				DisplayName:    "Desativar atalho de Teclas de Filtragem (Filter Keys ao segurar Shift)",
+				Explanation:    "Impede o travamento de repetição de teclas ao segurar a tecla Shift direita por 8 segundos durante jogos ou digitação rápida.",
 				Cat:            tweak.CategoryInput,
 				RiskLevel:      tweak.RiskLow,
 				NeedsRestart:   false,
@@ -692,6 +692,52 @@ func entries() []entry {
 				Caveat:             "Aviso de Acessibilidade: Indicado para evitar que o teclado seja travado acidentalmente ao segurar teclas em jogos competitivos.",
 				Evidence:           "https://support.microsoft.com/en-us/accessibility/windows/make-your-mouse-keyboard-and-other-input-devices-easier-to-use",
 				SortOrder:          57,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "sistema.long-paths",
+				DisplayName:    "Habilitar suporte a caminhos de arquivos longos (Long Paths 260+ caracteres)",
+				Explanation:    "Remove o limite clássico de 260 caracteres do Windows para nomes e caminhos de arquivos, essencial para NodeJS, Git, Rust, Go e compilação de código.",
+				Cat:            tweak.CategorySystem,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O suporte a caminhos longos (Long Paths) está habilitado.",
+				NotAppliedText: "O limite padrão de 260 caracteres para caminhos de arquivo está ativo.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathFileSystem, "LongPathsEnabled", 1, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Oficial da Microsoft desde o Windows 10. Permite que ferramentas de desenvolvimento lidem com pastas profundas em node_modules e subprojetos sem erros de I/O.",
+				Evidence:           "https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation",
+				SortOrder:          58,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "armazenamento.ntfs-last-access",
+				DisplayName:    "Desativar atualização de carimbo de último acesso NTFS",
+				Explanation:    "Evita que o Windows grave atualizações de data/hora de último acesso toda vez que um arquivo de código ou diretório for lido, acelerando compilações e buscas.",
+				Cat:            tweak.CategoryStorage,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "A atualização de carimbo de último acesso NTFS está desativada.",
+				NotAppliedText: "A gravação de carimbo de último acesso NTFS está ativa.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathFileSystem, "NtfsDisableLastAccessUpdate", 1, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Reduz operações de I/O de escrita redundantes no disco durante varreduras de antivírus e indexações pesadas de código.",
+				Evidence:           "https://learn.microsoft.com/en-us/windows-server/administration/performance-tuning/subsystems/software-defined-datacenter/file-server",
+				SortOrder:          59,
 			},
 		},
 	}

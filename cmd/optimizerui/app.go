@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"optimizer/internal/cpudiag"
 	"optimizer/internal/diskdiag"
 	"optimizer/internal/elevate"
 	"optimizer/internal/engine"
@@ -387,11 +388,11 @@ func (a *App) Sair() { encerrar(a.ctx) }
 // ------------------------------------------------------------------ Perfis de Rede
 
 type PerfilUI struct {
-	Key         string `json:"key"`
-	Nome        string `json:"nome"`
-	Descricao   string `json:"descricao"`
-	Ressalvas   string `json:"ressalvas"`
-	NumTweaks   int    `json:"numTweaks"`
+	Key       string `json:"key"`
+	Nome      string `json:"nome"`
+	Descricao string `json:"descricao"`
+	Ressalvas string `json:"ressalvas"`
+	NumTweaks int    `json:"numTweaks"`
 }
 
 // ListarPerfisRede retorna os perfis de rede disponíveis.
@@ -469,11 +470,11 @@ type BenchmarkUI struct {
 }
 
 type ComparativoUI struct {
-	Antes           BenchmarkUI `json:"antes"`
-	Depois          BenchmarkUI `json:"depois"`
-	DeltaLatencia   string      `json:"deltaLatencia"`
-	DeltaJitter     string      `json:"deltaJitter"`
-	Interpretacao   string      `json:"interpretacao"`
+	Antes         BenchmarkUI `json:"antes"`
+	Depois        BenchmarkUI `json:"depois"`
+	DeltaLatencia string      `json:"deltaLatencia"`
+	DeltaJitter   string      `json:"deltaJitter"`
+	Interpretacao string      `json:"interpretacao"`
 }
 
 // medirRede é a implementação comum de Antes/Depois — só muda o rótulo do momento.
@@ -648,3 +649,147 @@ func (a *App) BenchmarkDNS() []netdiag.DNSProvider {
 	return netdiag.BenchmarkDNS(ctx, nil)
 }
 
+// ---------------------------------------------------------------- Perfis de Uso (JOGO / CODING)
+
+// ListarPerfisUso lista os perfis de uso fechados (JOGO e CODING).
+func (a *App) ListarPerfisUso() []profiles.UseProfile {
+	return profiles.ListarPerfisUso()
+}
+
+// ObterPerfilAtivo identifica qual perfil de uso está atualmente ativo.
+func (a *App) ObterPerfilAtivo() string {
+	if a.eng == nil || a.eng.History == nil {
+		return ""
+	}
+	if _, entries, _ := a.eng.History.ActiveBatchForOrigin("perfil-jogo"); len(entries) > 0 {
+		return "jogo"
+	}
+	if _, entries, _ := a.eng.History.ActiveBatchForOrigin("perfil-coding"); len(entries) > 0 {
+		return "coding"
+	}
+	return ""
+}
+
+// AplicarPerfilUso aplica o perfil JOGO ou CODING transacionalmente.
+func (a *App) AplicarPerfilUso(key string, dryRun bool) []ResultadoUI {
+	p, ok := profiles.ObterPerfilUso(key)
+	if !ok {
+		return []ResultadoUI{{Nome: key, Estado: "falhou", Mensagem: "Perfil de uso desconhecido"}}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// 1. Reverte o perfil anterior se houver algum ativo
+	ativo := a.ObterPerfilAtivo()
+	if ativo != "" && ativo != key && !dryRun {
+		batchID, _, _ := a.eng.History.ActiveBatchForOrigin("perfil-" + ativo)
+		if batchID != "" {
+			_ = a.eng.RevertBatch(ctx, batchID, false)
+		}
+	}
+
+	// 2. Aplica o novo lote com ID de transação e origem
+	batchID := fmt.Sprintf("batch-%s-%d", key, time.Now().Unix())
+	origin := "perfil-" + key
+	rawResults := a.eng.ApplyBatch(ctx, p.TweakIDs, dryRun, origin, batchID)
+
+	// 3. Ajustes de energia e suspensão
+	if !dryRun {
+		if p.PowerPlanGUID != "" {
+			_ = systemdiag.AtivarPlanoEnergia(ctx, p.PowerPlanGUID)
+		}
+		if p.DisableSleepAC {
+			_ = exec.CommandContext(ctx, "powercfg", "/change", "standby-timeout-ac", "0").Run()
+		}
+		// Pausa ou retomada de serviços
+		for _, s := range p.ServicesToPause {
+			_ = exec.CommandContext(ctx, "net", "stop", s, "/y").Run()
+		}
+		for _, s := range p.ServicesToEnsure {
+			_ = exec.CommandContext(ctx, "net", "start", s).Run()
+		}
+	}
+
+	var results []ResultadoUI
+	for _, r := range rawResults {
+		estado := "ok"
+		if r.Skipped {
+			estado = "pulado"
+		} else if r.Err != nil {
+			estado = "falhou"
+		}
+		msg := r.Detail
+		if r.Reason != "" {
+			msg = r.Reason
+		}
+		if r.Err != nil {
+			msg = r.Err.Error()
+		}
+		results = append(results, ResultadoUI{
+			ID:          r.ID,
+			Nome:        r.Name,
+			Estado:      estado,
+			Mensagem:    msg,
+			PrecisaSair: r.RestartNeeded,
+		})
+	}
+	return results
+}
+
+// RestaurarPerfilUso restaura o estado anterior ao perfil ativo.
+func (a *App) RestaurarPerfilUso(key string) []ResultadoUI {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	batchID, entries, _ := a.eng.History.ActiveBatchForOrigin("perfil-" + key)
+	if batchID == "" || len(entries) == 0 {
+		return []ResultadoUI{{Nome: key, Estado: "pulado", Mensagem: "Nenhum lote ativo deste perfil para restaurar"}}
+	}
+
+	rawResults := a.eng.RevertBatch(ctx, batchID, false)
+
+	// Retoma serviços e restaura plano equilibrado se for jogo
+	if key == "jogo" {
+		_ = exec.CommandContext(ctx, "net", "start", "WSearch").Run()
+		_ = exec.CommandContext(ctx, "net", "start", "SysMain").Run()
+		_ = systemdiag.AtivarPlanoEnergia(ctx, "381b4222-f694-41f0-9685-ff5bb260df2e")
+	}
+
+	var results []ResultadoUI
+	for _, r := range rawResults {
+		estado := "ok"
+		if r.Skipped {
+			estado = "pulado"
+		} else if r.Err != nil {
+			estado = "falhou"
+		}
+		msg := r.Detail
+		if r.Reason != "" {
+			msg = r.Reason
+		}
+		if r.Err != nil {
+			msg = r.Err.Error()
+		}
+		results = append(results, ResultadoUI{
+			ID:          r.ID,
+			Nome:        r.Name,
+			Estado:      estado,
+			Mensagem:    msg,
+			PrecisaSair: r.RestartNeeded,
+		})
+	}
+	return results
+}
+
+// ObterMetricasCPU lê as métricas de uso e processos de CPU em tempo real.
+func (a *App) ObterMetricasCPU() cpudiag.CPUInfo {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	prober := cpudiag.NewLiveProber()
+	info, err := prober.GetCPUInfo(ctx)
+	if err != nil {
+		return cpudiag.CPUInfo{Interpretation: "Não foi possível ler dados de CPU no momento."}
+	}
+	return info
+}

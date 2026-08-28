@@ -626,15 +626,19 @@ func cmdPerfil(args []string) error {
 	fs := flag.NewFlagSet("perfil", flag.ContinueOnError)
 	g := addGlobals(fs)
 	fs.Usage = func() {
-		fmt.Fprint(os.Stderr, `Uso: optimizerctl perfil <subcomando>
+		fmt.Fprint(os.Stderr, `Uso: optimizerctl perfil <subcomando> [argumentos]
 
 Subcomandos:
-  listar           Lista os perfis disponíveis (Rede Rápida, Trabalho Remoto, etc)
-  aplicar <perfil> Aplica um perfil inteiro em lote
+  listar                  Lista todos os perfis disponíveis (JOGO, CODING e perfis de rede)
+  aplicar <jogo|coding>   Aplica um perfil inteiro com transação atômica
+  verificar <jogo|coding> Verifica a integridade dos ajustes do perfil
+  restaurar <jogo|coding> Restaura o estado anterior ao perfil ativo
 
 Exemplos:
   optimizerctl perfil listar
-  optimizerctl perfil aplicar network-fast --simular
+  optimizerctl perfil aplicar jogo --simular
+  optimizerctl perfil verificar coding
+  optimizerctl perfil restaurar jogo
 `)
 	}
 	soltos, err := parseArgs(fs, g, args)
@@ -652,41 +656,73 @@ Exemplos:
 		return cmdPerfilListar()
 	case "aplicar":
 		if len(soltos) < 2 {
-			return fmt.Errorf("aplicar requer um nome de perfil")
+			return fmt.Errorf("aplicar requer um nome de perfil (ex: jogo, coding, network-fast)")
 		}
 		return cmdPerfilAplicar(g, soltos[1])
+	case "verificar":
+		if len(soltos) < 2 {
+			return fmt.Errorf("verificar requer um nome de perfil (ex: jogo, coding)")
+		}
+		return cmdPerfilVerificar(g, soltos[1])
+	case "restaurar":
+		if len(soltos) < 2 {
+			return fmt.Errorf("restaurar requer o nome do perfil ativo a reverter (ex: jogo, coding)")
+		}
+		return cmdPerfilRestaurar(g, soltos[1])
 	default:
 		return fmt.Errorf("subcomando desconhecido: %s", subcmd)
 	}
 }
 
 func cmdPerfilListar() error {
-	fmt.Println("Perfis de rede disponíveis:")
+	fmt.Println("=== Perfis de Uso do Computador (private-optimizer) ===")
+	fmt.Println()
+	wUso := newTab()
+	fmt.Fprintln(wUso, "CHAVE\tNOME\tTWEAKS\tOBJETIVO")
+	for _, p := range profiles.ListarPerfisUso() {
+		fmt.Fprintf(wUso, "%s\t%s\t%d\t%s\n", p.Key, p.Nome, len(p.TweakIDs), p.Objetivo)
+	}
+	_ = wUso.Flush()
+
+	fmt.Println()
+	fmt.Println("=== Perfis Granulares de Rede ===")
 	fmt.Println()
 	w := newTab()
 	fmt.Fprintln(w, "CHAVE\tNOME\tTWEAKS\tDESCRIÇÃO")
 	for _, p := range profiles.List() {
 		fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", p.Key, p.Name, len(p.TweakIDs), p.Description)
 	}
-	if err := w.Flush(); err != nil {
-		return err
-	}
+	_ = w.Flush()
+
 	fmt.Println("\nPara aplicar: optimizerctl perfil aplicar <chave> [--simular]")
 	return nil
 }
 
 func cmdPerfilAplicar(g *globals, profileKey string) error {
+	// 1. Verifica se é Perfil de Uso (JOGO / CODING)
+	if up, ok := profiles.ObterPerfilUso(profileKey); ok {
+		eng, err := openEngine(g)
+		if err != nil {
+			return err
+		}
+		ctx, cancel := ctxWithSignal()
+		defer cancel()
+
+		fmt.Printf("Aplicando Perfil de Uso %q (%s) — %d item(ns)%s\n", up.Nome, up.Key, len(up.TweakIDs), seSimulacao(g.dryRun))
+		if up.Ressalvas != "" {
+			fmt.Printf("Ressalva: %s\n", up.Ressalvas)
+		}
+		fmt.Println()
+
+		batchID := fmt.Sprintf("batch-%s-%d", up.Key, time.Now().Unix())
+		origin := "perfil-" + up.Key
+		return imprimirResultados(eng.ApplyBatch(ctx, up.TweakIDs, g.dryRun, origin, batchID), g.dryRun)
+	}
+
+	// 2. Fallback para Perfis de Rede
 	p, ok := profiles.Get(profileKey)
 	if !ok {
 		return fmt.Errorf("perfil desconhecido: %q — rode `optimizerctl perfil listar`", profileKey)
-	}
-
-	if len(p.TweakIDs) == 0 {
-		fmt.Printf("Perfil %q (%s) não tem tweaks automatizados ainda — apenas recomendações manuais.\n", p.Name, p.Key)
-		if p.Caveats != "" {
-			fmt.Printf("Ressalva: %s\n", p.Caveats)
-		}
-		return nil
 	}
 
 	eng, err := openEngine(g)
@@ -697,13 +733,65 @@ func cmdPerfilAplicar(g *globals, profileKey string) error {
 	ctx, cancel := ctxWithSignal()
 	defer cancel()
 
-	fmt.Printf("Aplicando perfil %q (%s) — %d item(ns)%s\n", p.Name, p.Key, len(p.TweakIDs), seSimulacao(g.dryRun))
+	fmt.Printf("Aplicando perfil de rede %q (%s) — %d item(ns)%s\n", p.Name, p.Key, len(p.TweakIDs), seSimulacao(g.dryRun))
 	if p.Caveats != "" {
 		fmt.Printf("Ressalva: %s\n", p.Caveats)
 	}
 	fmt.Println()
 
 	return imprimirResultados(eng.Apply(ctx, p.TweakIDs, g.dryRun), g.dryRun)
+}
+
+func cmdPerfilVerificar(g *globals, profileKey string) error {
+	up, ok := profiles.ObterPerfilUso(profileKey)
+	if !ok {
+		return fmt.Errorf("perfil de uso desconhecido: %q", profileKey)
+	}
+
+	eng, err := openEngine(g)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := ctxWithSignal()
+	defer cancel()
+
+	fmt.Printf("Verificando integridade do perfil %q (%s):\n\n", up.Nome, up.Key)
+	w := newTab()
+	fmt.Fprintln(w, "ESTADO\tTWEAK\tDETALHE")
+	for _, id := range up.TweakIDs {
+		t, ok := eng.Registry.Known(id)
+		if !ok {
+			continue
+		}
+		meta, _ := eng.Registry.Meta(id)
+		st, _ := t.Check(ctx)
+		statusMark := "[ ]"
+		if st.State == tweak.StateApplied {
+			statusMark = "[x]"
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\n", statusMark, meta.DisplayName, st.Detail)
+	}
+	return w.Flush()
+}
+
+func cmdPerfilRestaurar(g *globals, profileKey string) error {
+	eng, err := openEngine(g)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := ctxWithSignal()
+	defer cancel()
+
+	batchID, entries, _ := eng.History.ActiveBatchForOrigin("perfil-" + profileKey)
+	if batchID == "" || len(entries) == 0 {
+		fmt.Printf("Nenhuma alteração ativa do perfil %q para restaurar.\n", profileKey)
+		return nil
+	}
+
+	fmt.Printf("Restaurando %d item(ns) do lote %s...\n\n", len(entries), batchID)
+	return imprimirResultados(eng.RevertBatch(ctx, batchID, g.dryRun), g.dryRun)
 }
 
 func cmdRede(args []string) error {

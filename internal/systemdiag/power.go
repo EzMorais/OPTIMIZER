@@ -8,9 +8,9 @@ import (
 
 // PowerPlan representa um plano de energia do Windows.
 type PowerPlan struct {
-	GUID   string `json:"guid"`
-	Nome   string `json:"nome"`
-	Ativo  bool   `json:"ativo"`
+	GUID  string `json:"guid"`
+	Nome  string `json:"nome"`
+	Ativo bool   `json:"ativo"`
 }
 
 // ListarPlanosEnergia lista os esquemas de energia instalados via powercfg.
@@ -34,7 +34,7 @@ func ListarPlanosEnergia(ctx context.Context) ([]PowerPlan, error) {
 			continue
 		}
 		resto := strings.TrimSpace(partes[1])
-		
+
 		guid := ""
 		nome := ""
 		ativo := strings.Contains(l, "*")

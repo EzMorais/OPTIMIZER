@@ -33,16 +33,16 @@ func TestAppDiagnosticar(t *testing.T) {
 	app := novoAppTeste(t)
 
 	diagPessoal := app.Diagnosticar("pessoal")
-	if diagPessoal.Total != 25 {
-		t.Errorf("Total pessoal = %d, esperado 25", diagPessoal.Total)
+	if diagPessoal.Total != 27 {
+		t.Errorf("Total pessoal = %d, esperado 27", diagPessoal.Total)
 	}
 	if diagPessoal.Perfil != "pessoal" {
 		t.Errorf("Perfil = %s, esperado pessoal", diagPessoal.Perfil)
 	}
 
 	diagTrabalho := app.Diagnosticar("trabalho")
-	if diagTrabalho.Total != 19 {
-		t.Errorf("Total trabalho = %d, esperado 19", diagTrabalho.Total)
+	if diagTrabalho.Total != 21 {
+		t.Errorf("Total trabalho = %d, esperado 21", diagTrabalho.Total)
 	}
 	if diagTrabalho.Perfil != "trabalho" {
 		t.Errorf("Perfil = %s, esperado trabalho", diagTrabalho.Perfil)
@@ -118,5 +118,38 @@ func TestAppRelatorioComparativo(t *testing.T) {
 	comp := app.RelatorioComparativo(antes, depois)
 	if comp.DeltaLatencia == "" || comp.Interpretacao == "" {
 		t.Errorf("Relatório comparativo incompleto: %+v", comp)
+	}
+}
+
+func TestAppPerfisUso(t *testing.T) {
+	app := novoAppTeste(t)
+
+	perfis := app.ListarPerfisUso()
+	if len(perfis) < 2 {
+		t.Fatalf("esperado pelo menos 2 perfis de uso, obteve %d", len(perfis))
+	}
+
+	// Sem perfil ativo inicial
+	ativo := app.ObterPerfilAtivo()
+	if ativo != "" {
+		t.Errorf("nenhum perfil deveria estar ativo inicialmente, obteve %q", ativo)
+	}
+
+	// Aplicar perfil JOGO em simulação
+	resJogo := app.AplicarPerfilUso("jogo", true)
+	if len(resJogo) == 0 {
+		t.Fatal("esperado resultado para perfil jogo")
+	}
+
+	// Aplicar perfil CODING em simulação
+	resCoding := app.AplicarPerfilUso("coding", true)
+	if len(resCoding) == 0 {
+		t.Fatal("esperado resultado para perfil coding")
+	}
+
+	// Perfil inválido
+	resInvalido := app.AplicarPerfilUso("invalido", true)
+	if len(resInvalido) != 1 || resInvalido[0].Estado != "falhou" {
+		t.Errorf("esperado erro ao aplicar perfil inválido")
 	}
 }

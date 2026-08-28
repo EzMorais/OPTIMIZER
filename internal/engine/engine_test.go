@@ -155,3 +155,37 @@ func TestPontoDeRestauracaoQueFalhaAbortaOLote(t *testing.T) {
 		t.Fatalf("alterou o sistema mesmo sem conseguir criar a rede de segurança: %v", f.Keys())
 	}
 }
+
+func TestRevertBatchPreservesManualTweaks(t *testing.T) {
+	f := winreg.NewFake()
+	eng := novoMotor(t, f, false)
+	ctx := context.Background()
+
+	idManual := "visual.menu-show-delay"
+	idPerfil := "jogos.gamedvr-usuario"
+
+	// 1. Aplica ajuste manual
+	eng.ApplyBatch(ctx, []string{idManual}, false, "manual", "batch-manual-1")
+
+	// 2. Aplica perfil
+	batchPerfil := "batch-jogo-1"
+	eng.ApplyBatch(ctx, []string{idPerfil}, false, "perfil-jogo", batchPerfil)
+
+	// 3. Reverte apenas o lote do perfil
+	res := eng.RevertBatch(ctx, batchPerfil, false)
+	if len(res) == 0 || !res[0].Applied {
+		t.Fatalf("RevertBatch falhou: %+v", res)
+	}
+
+	// 4. Verifica que o tweak manual ainda está pendente/ativo
+	pending, err := eng.History.Pending()
+	if err != nil {
+		t.Fatalf("Pending: %v", err)
+	}
+	if _, ok := pending[idManual]; !ok {
+		t.Error("ajuste manual foi indevidamente removido ao reverter o lote do perfil")
+	}
+	if _, ok := pending[idPerfil]; ok {
+		t.Error("tweak do perfil ainda consta como pendente após RevertBatch")
+	}
+}

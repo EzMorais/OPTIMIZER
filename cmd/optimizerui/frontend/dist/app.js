@@ -1489,7 +1489,7 @@ async function carregarEstadoPerfis() {
     listaPerfisUso = await App.ListarPerfisUso();
     const ativo = await App.ObterPerfilAtivo();
 
-    ["jogo", "coding"].forEach((key) => {
+    ["jogo", "nvidia", "coding"].forEach((key) => {
       const card = $("#card-perfil-" + key);
       const badge = $("#status-perfil-" + key);
       const btnApply = $("#btn-apply-" + key);

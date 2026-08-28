@@ -829,6 +829,9 @@ func (a *App) ObterPerfilAtivo() string {
 	if _, entries, _ := a.eng.History.ActiveBatchForOrigin("perfil-jogo"); len(entries) > 0 {
 		return "jogo"
 	}
+	if _, entries, _ := a.eng.History.ActiveBatchForOrigin("perfil-nvidia"); len(entries) > 0 {
+		return "nvidia"
+	}
 	if _, entries, _ := a.eng.History.ActiveBatchForOrigin("perfil-coding"); len(entries) > 0 {
 		return "coding"
 	}

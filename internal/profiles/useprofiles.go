@@ -1,4 +1,4 @@
-// Package profiles define os perfis de uso fechados JOGO e CODING.
+// Package profiles define os perfis de uso fechados JOGO, CODING e NVIDIA.
 package profiles
 
 // UseProfile representa um perfil completo de uso do computador.
@@ -16,7 +16,7 @@ type UseProfile struct {
 	ServicesToEnsure []string `json:"servicesToEnsure,omitempty"`
 }
 
-// ListarPerfisUso devolve as definições oficiais dos perfis JOGO e CODING.
+// ListarPerfisUso devolve as definições oficiais dos perfis JOGO, CODING e NVIDIA.
 func ListarPerfisUso() []UseProfile {
 	return []UseProfile{
 		{
@@ -59,6 +59,29 @@ func ListarPerfisUso() []UseProfile {
 			ServicesToPause: []string{"WSearch", "SysMain"},
 		},
 		{
+			Key:        "nvidia",
+			Nome:       "NVIDIA — Ultra Latência & Clocks",
+			Objetivo:   "Desempenho máximo para GPUs GeForce: PowerMizer fixo, Cache de Shaders 10GB, HAGS, D3PC Ultra e sem telemetria.",
+			Descricao:  "Otimiza o pipeline do driver NVIDIA, fixa clocks estáveis em jogos pesados e elimina micro-travamentos por compilação de shaders.",
+			Categorias: []string{"GPU", "NVIDIA", "Jogos", "Latência"},
+			Ressalvas:  "Exclusivo para placas de vídeo NVIDIA GeForce. Em laptops fora da tomada, mantém a GPU em maior consumo.",
+			TweakIDs: []string{
+				"jogos.nvidia-powermizer-performance",
+				"jogos.nvidia-shader-cache-size",
+				"jogos.nvidia-d3pc-low-latency",
+				"privacidade.nvidia-telemetry-off",
+				"visual.hags",
+				"jogos.game-mode",
+				"jogos.windowed-optimizations",
+				"jogos.mmcss-low-latency",
+				"jogos.dxgkrnl-latency-tolerance",
+				"entrada.keyboard-repeat-rate",
+				"sistema.mmcss-system-responsiveness",
+			},
+			PowerPlanGUID:  "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", // Alto Desempenho
+			DisableSleepAC: true,
+		},
+		{
 			Key:        "coding",
 			Nome:       "CODING — Compilação & Estabilidade",
 			Objetivo:   "Máximo throughput para IDEs, compilação de código, suporte a caminhos longos e estabilidade para Docker/WSL.",
@@ -87,7 +110,7 @@ func ListarPerfisUso() []UseProfile {
 	}
 }
 
-// ObterPerfilUso busca um perfil pela chave ("jogo" ou "coding").
+// ObterPerfilUso busca um perfil pela chave ("jogo", "nvidia" ou "coding").
 func ObterPerfilUso(key string) (UseProfile, bool) {
 	for _, p := range ListarPerfisUso() {
 		if p.Key == key {

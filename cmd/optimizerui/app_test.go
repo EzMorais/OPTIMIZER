@@ -158,6 +158,12 @@ func TestAppPerfisUso(t *testing.T) {
 		t.Fatal("esperado resultado para perfil jogo")
 	}
 
+	// Aplicar perfil NVIDIA em simulação
+	resNvidia := app.AplicarPerfilUso("nvidia", true)
+	if len(resNvidia) == 0 {
+		t.Fatal("esperado resultado para perfil nvidia")
+	}
+
 	// Aplicar perfil CODING em simulação
 	resCoding := app.AplicarPerfilUso("coding", true)
 	if len(resCoding) == 0 {

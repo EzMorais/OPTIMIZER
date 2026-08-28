@@ -84,6 +84,9 @@ const (
 	pathContentDelivery     = `Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager`
 	pathAdvInfo             = `Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo`
 	pathErrorReporting      = `SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting`
+	pathNvidiaClassPrimary  = `SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000`
+	pathNvidiaNvTweakGlobal = `SOFTWARE\NVIDIA Corporation\Global\NVTweak`
+	pathNvidiaNvCplOptIn    = `SOFTWARE\NVIDIA Corporation\NvControlPanel2\Client`
 )
 
 func entries() []entry {
@@ -1085,6 +1088,100 @@ func entries() []entry {
 				SortOrder:          195,
 			},
 		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "jogos.nvidia-powermizer-performance",
+				DisplayName:    "NVIDIA PowerMizer em Desempenho Máximo (Modo de Energia GPU)",
+				Explanation:    "Fixa o perfil de energia da GPU NVIDIA para Desempenho Máximo (PowerMizerLevel=1), impedindo que o clock da GPU caia durante trocas de cena ou carregamento de jogos.",
+				Cat:            tweak.CategoryGaming,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O PowerMizer da GPU NVIDIA está configurado em Desempenho Máximo.",
+				NotAppliedText: "O PowerMizer da GPU NVIDIA está no modo adaptativo/padrão.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathNvidiaClassPrimary, "PowerMizerEnable", 1, 0),
+				regtweak.DWord(winreg.HKLM, pathNvidiaClassPrimary, "PowerMizerLevel", 1, 0),
+				regtweak.DWord(winreg.HKLM, pathNvidiaClassPrimary, "PowerMizerLevelAC", 1, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfilePersonal,
+				RequiresAdmin:      true,
+				Caveat:             "Mantém os clocks de núcleo e memória estáveis em jogos pesados. Em laptops desconectados da tomada, consome mais bateria.",
+				Evidence:           "docs/catalogo/hardware-energia-gpu.md#nvidia-powermizer",
+				SortOrder:          200,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "jogos.nvidia-shader-cache-size",
+				DisplayName:    "Aumentar Cache de Shaders NVIDIA (10 GB para evitar stutters)",
+				Explanation:    "Expande o limite de cache de shaders compilados da placa NVIDIA para 10 GB, eliminando travamentos causados por recompilação constante em jogos DirectX 12 e Vulkan.",
+				Cat:            tweak.CategoryGaming,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O Cache de Shaders NVIDIA está configurado para 10 GB.",
+				NotAppliedText: "O Cache de Shaders NVIDIA está no limite padrão do driver.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathNvidiaNvTweakGlobal, "ShaderCacheSize", 10240, 4096),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Reduz quedas bruscas de FPS ao entrar em novas áreas em jogos modernos (Unreal Engine / DX12).",
+				Evidence:           "docs/catalogo/hardware-energia-gpu.md#nvidia-shader-cache",
+				SortOrder:          205,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "jogos.nvidia-d3pc-low-latency",
+				DisplayName:    "Pipeline de Baixa Latência D3PC NVIDIA",
+				Explanation:    "Configura a latência D3PC no driver de vídeo NVIDIA para 0 (modo ultrarrápido), reduzindo o atraso de sincronização de quadros da GPU.",
+				Cat:            tweak.CategoryGaming,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "O pipeline D3PC está configurado em latência ultrarrápida (0).",
+				NotAppliedText: "O pipeline D3PC está no padrão de fábrica (1).",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathNvidiaClassPrimary, "D3PCLatency", 0, 1),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfilePersonal,
+				RequiresAdmin:      true,
+				Caveat:             "Otimização recomendada para jogos competitivos com alta taxa de quadros (144Hz+).",
+				Evidence:           "docs/catalogo/hardware-energia-gpu.md#nvidia-low-latency",
+				SortOrder:          210,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "privacidade.nvidia-telemetry-off",
+				DisplayName:    "Desativar telemetria do Painel de Controle NVIDIA",
+				Explanation:    "Desativa a coleta e o envio em segundo plano de telemetria de uso e diagnóstico do driver e painel NVIDIA.",
+				Cat:            tweak.CategoryPrivacyNonSecurity,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "A telemetria do Painel de Controle NVIDIA está desativada.",
+				NotAppliedText: "A telemetria da NVIDIA está ativa.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathNvidiaNvCplOptIn, "OptIn", 0, 1),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Evita tráfego de rede e consumo em segundo plano de processos auxiliares do driver de vídeo.",
+				Evidence:           "docs/catalogo/registro.md#nvidia-telemetry",
+				SortOrder:          215,
+			},
+		},
 	}
 }
 
@@ -1092,3 +1189,4 @@ func withSatisfied(v regtweak.Value, f func(any) bool) regtweak.Value {
 	v.AlreadyOptimized = f
 	return v
 }
+

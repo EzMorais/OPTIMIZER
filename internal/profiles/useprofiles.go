@@ -48,6 +48,10 @@ func ListarPerfisUso() []UseProfile {
 				"rede.network-throttling-off",
 				"rede.tcp-timed-wait-delay",
 				"rede.max-user-port",
+				"jogos.nvidia-powermizer-performance",
+				"jogos.nvidia-shader-cache-size",
+				"jogos.nvidia-d3pc-low-latency",
+				"privacidade.nvidia-telemetry-off",
 				"privacidade.content-delivery-suggestions-off",
 			},
 			PowerPlanGUID:   "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", // Alto Desempenho

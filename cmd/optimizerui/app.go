@@ -649,6 +649,43 @@ func (a *App) BenchmarkDNS() []netdiag.DNSProvider {
 	return netdiag.BenchmarkDNS(ctx, nil)
 }
 
+// ResultadoLimpezaPnp resume os nós removidos.
+type ResultadoLimpezaPnp struct {
+	Removidos int      `json:"removidos"`
+	Erros     []string `json:"erros"`
+	Mensagem  string   `json:"mensagem"`
+}
+
+// ListarDispositivosFantasmas identifica dispositivos PnP desconectados ou órfãos no sistema.
+func (a *App) ListarDispositivosFantasmas() []systemdiag.PnpDevice {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	devs, err := systemdiag.ListarDispositivosFantasmas(ctx)
+	if err != nil {
+		return []systemdiag.PnpDevice{}
+	}
+	return devs
+}
+
+// LimparDispositivosFantasmas remove os dispositivos informados usando pnputil.
+func (a *App) LimparDispositivosFantasmas(instanceIDs []string) ResultadoLimpezaPnp {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	removidos, errs, err := systemdiag.LimparDispositivosFantasmas(ctx, instanceIDs)
+	msg := fmt.Sprintf("%d dispositivo(s) fantasma(s) removido(s) com sucesso.", removidos)
+	if len(errs) > 0 {
+		msg += fmt.Sprintf(" (%d falha(s))", len(errs))
+	}
+	if err != nil {
+		msg = err.Error()
+	}
+	return ResultadoLimpezaPnp{
+		Removidos: removidos,
+		Erros:     errs,
+		Mensagem:  msg,
+	}
+}
+
 // ---------------------------------------------------------------- Perfis de Uso (JOGO / CODING)
 
 // ListarPerfisUso lista os perfis de uso fechados (JOGO e CODING).

@@ -322,6 +322,12 @@ function ligarEventos() {
   const btnTestarDNS = $("#btn-testar-dns");
   if (btnTestarDNS) btnTestarDNS.addEventListener("click", testarDNS);
 
+  const btnEscanearPnp = $("#btn-escanear-pnp");
+  if (btnEscanearPnp) btnEscanearPnp.addEventListener("click", escanearDispositivosFantasmas);
+
+  const btnLimparPnp = $("#btn-limpar-pnp");
+  if (btnLimparPnp) btnLimparPnp.addEventListener("click", limparDispositivosFantasmas);
+
   const inputBusca = $("#busca-tweak");
   const btnLimpar = $("#btn-limpar-busca");
   if (inputBusca) {
@@ -1217,6 +1223,91 @@ async function testarDNS() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = "Testar Servidores DNS";
+  }
+}
+
+/* ==========================================================================
+   Limpeza de Dispositivos Fantasmas (Ghost PnP Devices)
+   ========================================================================== */
+
+let listaDispositivosFantasmas = [];
+
+async function escanearDispositivosFantasmas() {
+  const btn = $("#btn-escanear-pnp");
+  const btnLimpar = $("#btn-limpar-pnp");
+  const resEl = $("#pnp-resultado");
+
+  btn.disabled = true;
+  btn.innerHTML = `<span class="pulse-spinner"></span> Buscando…`;
+  resEl.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Consultando dispositivos PnP desconectados e órfãos…</span></div>';
+
+  Visualizer.show();
+  Visualizer.log({ type: "read", msg: "Consultando tabela PnP em busca de dispositivos desconectados ou órfãos..." });
+
+  try {
+    listaDispositivosFantasmas = await App.ListarDispositivosFantasmas();
+    if (!listaDispositivosFantasmas || !listaDispositivosFantasmas.length) {
+      resEl.innerHTML = '<div class="glass-card" style="border-left: 3px solid var(--accent);"><h3 class="card-title">Nenhum Dispositivo Fantasma Encontrado</h3><p class="card-subtitle">A árvore de dispositivos Plug-and-Play do Windows está limpa e sem nós órfãos.</p></div>';
+      btnLimpar.style.display = "none";
+      return;
+    }
+
+    Visualizer.log({
+      type: "read",
+      msg: `Foram encontrados ${listaDispositivosFantasmas.length} nós de dispositivos desconectados/fantasmas.`
+    });
+
+    resEl.innerHTML = `
+      <div style="margin-bottom:12px;">
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">
+          Foram encontrados <b>${listaDispositivosFantasmas.length}</b> dispositivo(s) desconectado(s) ou órfão(s):
+        </p>
+        <div class="terminal-block" style="max-height:220px; overflow-y:auto;">
+          ${listaDispositivosFantasmas.map((d) => `
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12px;">
+              <span>• <b>${esc(d.FriendlyName || d.InstanceId)}</b> <span class="badge-tag rec">${esc(d.Class || 'PnP')}</span></span>
+              <span class="mono muted small">${esc(d.InstanceId)}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+    btnLimpar.style.display = "inline-flex";
+    btnLimpar.textContent = `Limpar ${listaDispositivosFantasmas.length} Dispositivo(s)`;
+  } catch (e) {
+    resEl.innerHTML = `<div class="empty-results"><p>Erro ao listar dispositivos: ${esc(String(e))}</p></div>`;
+    btnLimpar.style.display = "none";
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "Buscar Dispositivos";
+  }
+}
+
+async function limparDispositivosFantasmas() {
+  if (!listaDispositivosFantasmas || !listaDispositivosFantasmas.length) return;
+
+  const btnLimpar = $("#btn-limpar-pnp");
+  btnLimpar.disabled = true;
+  btnLimpar.innerHTML = `<span class="pulse-spinner"></span> Removendo…`;
+
+  Visualizer.show();
+  Visualizer.log({ type: "write", msg: `Iniciando remoção segura de ${listaDispositivosFantasmas.length} dispositivos fantasmas via pnputil...` });
+
+  try {
+    const ids = listaDispositivosFantasmas.map((d) => d.InstanceId);
+    const res = await App.LimparDispositivosFantasmas(ids);
+
+    Visualizer.log({
+      type: res.erros && res.erros.length > 0 ? "verify" : "write",
+      msg: res.mensagem
+    });
+
+    toast(res.mensagem, res.erros && res.erros.length > 0 ? "aviso" : "ok");
+    await escanearDispositivosFantasmas();
+  } catch (e) {
+    toast(`Erro na limpeza de dispositivos: ${e}`, "erro");
+  } finally {
+    btnLimpar.disabled = false;
   }
 }
 

@@ -33,16 +33,16 @@ func TestAppDiagnosticar(t *testing.T) {
 	app := novoAppTeste(t)
 
 	diagPessoal := app.Diagnosticar("pessoal")
-	if diagPessoal.Total != 27 {
-		t.Errorf("Total pessoal = %d, esperado 27", diagPessoal.Total)
+	if diagPessoal.Total != 41 {
+		t.Errorf("Total pessoal = %d, esperado 41", diagPessoal.Total)
 	}
 	if diagPessoal.Perfil != "pessoal" {
 		t.Errorf("Perfil = %s, esperado pessoal", diagPessoal.Perfil)
 	}
 
 	diagTrabalho := app.Diagnosticar("trabalho")
-	if diagTrabalho.Total != 21 {
-		t.Errorf("Total trabalho = %d, esperado 21", diagTrabalho.Total)
+	if diagTrabalho.Total != 29 {
+		t.Errorf("Total trabalho = %d, esperado 29", diagTrabalho.Total)
 	}
 	if diagTrabalho.Perfil != "trabalho" {
 		t.Errorf("Perfil = %s, esperado trabalho", diagTrabalho.Perfil)
@@ -151,5 +151,19 @@ func TestAppPerfisUso(t *testing.T) {
 	resInvalido := app.AplicarPerfilUso("invalido", true)
 	if len(resInvalido) != 1 || resInvalido[0].Estado != "falhou" {
 		t.Errorf("esperado erro ao aplicar perfil inválido")
+	}
+}
+
+func TestAppDispositivosFantasmas(t *testing.T) {
+	app := novoAppTeste(t)
+	devs := app.ListarDispositivosFantasmas()
+	// No teste em fake/mock não deve quebrar
+	if devs == nil {
+		t.Errorf("esperado array não nulo de dispositivos")
+	}
+
+	res := app.LimparDispositivosFantasmas(nil)
+	if res.Removidos != 0 {
+		t.Errorf("esperado 0 removidos para lista vazia")
 	}
 }

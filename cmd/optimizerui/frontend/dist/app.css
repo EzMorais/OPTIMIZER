@@ -2162,5 +2162,8 @@ input {
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: var(--radius-full); }
-::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
+.card-header-icon.pnp {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+}
 

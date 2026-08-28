@@ -260,6 +260,25 @@
       <div id="dns-resultado" style="margin-top:16px;">
         <p class="muted-text">Clique em "Testar Servidores DNS" para medir a velocidade de resolução.</p>
       </div>
+    <!-- Limpeza de Dispositivos Fantasmas -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon pnp">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Limpeza de Dispositivos Fantasmas (Ghost PnP Devices)</h2>
+          <p class="card-subtitle">Detecta e remove com segurança nós de dispositivos USB, adaptadores e periféricos antigos desconectados que ocupam handles e IRQs.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-escanear-pnp">Buscar Dispositivos</button>
+          <button class="btn-primary small-btn" id="btn-limpar-pnp" style="display:none;">Limpar Selecionados</button>
+        </div>
+      </div>
+
+      <div id="pnp-resultado" style="margin-top:16px;">
+        <p class="muted-text">Clique em "Buscar Dispositivos" para verificar se há dispositivos desconectados ou órfãos no sistema.</p>
+      </div>
     </div>
 
   </section>
@@ -295,6 +314,8 @@
           <button class="pill-btn" data-cat="Sistema">Sistema</button>
           <button class="pill-btn" data-cat="Armazenamento">Disco & SSD</button>
           <button class="pill-btn" data-cat="Mouse e teclado">Entrada</button>
+          <button class="pill-btn" data-cat="Energia">Energia</button>
+          <button class="pill-btn" data-cat="Privacidade">Privacidade</button>
         </div>
 
         <div class="status-pills" id="filtros-status">

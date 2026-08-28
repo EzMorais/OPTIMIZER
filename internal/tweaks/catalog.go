@@ -90,6 +90,7 @@ const (
 	pathKernelManager       = `SYSTEM\CurrentControlSet\Control\Session Manager\kernel`
 	pathDataCollection      = `SOFTWARE\Policies\Microsoft\Windows\DataCollection`
 	pathSystemPolicy        = `SOFTWARE\Policies\Microsoft\Windows\System`
+	pathInputSettings       = `Software\Microsoft\Input\Settings`
 )
 
 func entries() []entry {
@@ -1254,6 +1255,72 @@ func entries() []entry {
 				Caveat:             "Elimina relatórios contínuos de uso enviados em segundo plano para servidores externos.",
 				Evidence:           "docs/catalogo/privacidade.md#telemetry-datacollection",
 				SortOrder:          235,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "sistema.taskbar-widgets-off",
+				DisplayName:    "Desativar botão e feed de Widgets / Notícias da Barra de Tarefas (Win11)",
+				Explanation:    "Oculta o botão de Widgets/Notícias e encerra o processo em segundo plano WebView2/Widgets.exe que consome memória RAM.",
+				Cat:            tweak.CategorySystem,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "Widgets e Notícias da barra de tarefas estão desativados.",
+				NotAppliedText: "Widgets e Notícias da barra de tarefas estão ativos.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKCU, pathExplorerAdv, "TaskbarDa", 0, 1),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				Caveat:             "Economiza mais de 150 MB de memória RAM consumida pelo processo de widgets do WebView2.",
+				Evidence:           "docs/catalogo/registro.md#taskbar-widgets",
+				SortOrder:          240,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "sistema.taskbar-chat-off",
+				DisplayName:    "Desativar botão de Chat / Teams integrado da Barra de Tarefas (Win11)",
+				Explanation:    "Oculta o ícone de Chat/Teams integrado da barra de tarefas, evitando a inicialização automática de componentes em segundo plano.",
+				Cat:            tweak.CategorySystem,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O botão de Chat da barra de tarefas está desativado.",
+				NotAppliedText: "O botão de Chat da barra de tarefas está visível.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKCU, pathExplorerAdv, "TaskbarMn", 0, 1),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				Caveat:             "Limpa a barra de tarefas e reduz processos em segundo plano de comunicação não utilizada.",
+				Evidence:           "docs/catalogo/registro.md#taskbar-chat",
+				SortOrder:          245,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "privacidade.typing-insights-off",
+				DisplayName:    "Desativar telemetria de escrita e sugestões de digitação (Insights)",
+				Explanation:    "Impede o Windows de coletar estatísticas sobre digitação, autocorreção e escrita manual para gerar insights.",
+				Cat:            tweak.CategoryPrivacyNonSecurity,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "A coleta de insights de digitação e escrita está desligada.",
+				NotAppliedText: "A coleta de insights de digitação e escrita está ativa.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKCU, pathInputSettings, "InsightsEnabled", 0, 1),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				Caveat:             "Preserva a privacidade ao digitar senhas e textos em qualquer aplicativo.",
+				Evidence:           "docs/catalogo/privacidade.md#typing-insights",
+				SortOrder:          250,
 			},
 		},
 	}

@@ -357,6 +357,12 @@ function ligarEventos() {
   const btnTestarDNS = $("#btn-testar-dns");
   if (btnTestarDNS) btnTestarDNS.addEventListener("click", testarDNS);
 
+  const btnTestarMatrizJogos = $("#btn-testar-matriz-jogos");
+  if (btnTestarMatrizJogos) btnTestarMatrizJogos.addEventListener("click", testarMatrizJogos);
+
+  const btnFlushRede = $("#btn-flush-rede");
+  if (btnFlushRede) btnFlushRede.addEventListener("click", executarFlushRede);
+
   const btnEscanearPnp = $("#btn-escanear-pnp");
   if (btnEscanearPnp) btnEscanearPnp.addEventListener("click", escanearDispositivosFantasmas);
 
@@ -1136,6 +1142,90 @@ function comparativoHTML(c) {
     <p class="card-subtitle">${esc(c.interpretacao)}</p>
     <p class="field-hint" style="margin-top:6px">Variação de Latência: <b>${esc(c.deltaLatencia)}</b> · Jitter: <b>${esc(c.deltaJitter)}</b></p>
   </div>`;
+}
+
+async function testarMatrizJogos() {
+  const container = $("#matriz-jogos-container");
+  const btn = $("#btn-testar-matriz-jogos");
+  if (btn) btn.disabled = true;
+  if (container) {
+    container.innerHTML = `<div class="health-loading"><span class="pulse-spinner"></span><span>Medindo tempo de resposta com nós globais de jogos…</span></div>`;
+  }
+
+  try {
+    const regioes = await App.MatrizPingJogos();
+    if (!regioes || regioes.length === 0) {
+      if (container) container.innerHTML = `<p class="muted-text">Não foi possível obter dados da matriz de jogos.</p>`;
+      return;
+    }
+
+    if (container) {
+      container.innerHTML = regioes.map((r) => {
+        let badgeColor = "#10b981";
+        let statusLabel = "Excelente";
+        if (r.status === "bom") { badgeColor = "#3b82f6"; statusLabel = "Bom"; }
+        else if (r.status === "regular") { badgeColor = "#f59e0b"; statusLabel = "Regular"; }
+        else if (r.status === "alto") { badgeColor = "#ef4444"; statusLabel = "Alto"; }
+        else if (r.status === "indisponivel") { badgeColor = "#6b7280"; statusLabel = "Sem Resposta"; }
+
+        const pingStr = r.pingMs > 0 ? `${r.pingMs} ms` : "—";
+        const jitterStr = r.jitterMs > 0 ? `±${r.jitterMs.toFixed(1)}ms` : "";
+
+        return `
+          <div class="game-node-card" style="background:var(--bg-sunken); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-subtle); display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.95rem;">${r.bandeira || '🌐'} <b>${esc(r.nome)}</b></span>
+              <span class="mono bold" style="color:${badgeColor}; font-size:0.75rem; background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px;">${statusLabel}</span>
+            </div>
+            <div style="font-size:0.72rem; color:var(--text-muted);">${esc(r.localizacao)} (${esc(r.host)})</div>
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:4px;">
+              <span class="mono bold" style="font-size:1.3rem; color:${badgeColor};">${pingStr}</span>
+              <span class="mono" style="font-size:0.75rem; color:var(--text-secondary);">${jitterStr}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+  } catch (e) {
+    if (container) container.innerHTML = `<p class="danger-text">Erro ao testar matriz: ${esc(e)}</p>`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function executarFlushRede() {
+  const container = $("#flush-resultado");
+  const btn = $("#btn-flush-rede");
+  if (btn) btn.disabled = true;
+  if (container) {
+    container.innerHTML = `<div class="health-loading"><span class="pulse-spinner"></span><span>Limpando cache DNS, renovando DHCP e resetando Winsock…</span></div>`;
+  }
+
+  try {
+    toast("Executando limpeza profunda da pilha de rede…", "info");
+    const res = await App.FlushingRede();
+    Visualizer.log({
+      type: res.ok ? "apply" : "warn",
+      msg: `[FLUSH REDE] ${res.mensagem}`
+    });
+
+    if (container) {
+      container.innerHTML = `
+        <div style="background:var(--bg-sunken); padding:12px; border-radius:var(--radius-md); border:1px solid ${res.ok ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'};">
+          <strong style="color:${res.ok ? 'var(--accent)' : 'var(--danger)'};">${esc(res.mensagem)}</strong>
+          <ul style="margin:8px 0 0 16px; font-size:12px; color:var(--text-secondary);">
+            ${(res.etapas || []).map((e) => `<li>${esc(e)}</li>`).join("")}
+            ${(res.erros || []).map((e) => `<li style="color:var(--danger);">${esc(e)}</li>`).join("")}
+          </ul>
+        </div>
+      `;
+    }
+    toast(res.mensagem, res.ok ? "ok" : "warn");
+  } catch (e) {
+    if (container) container.innerHTML = `<p class="danger-text">Erro no flush: ${esc(e)}</p>`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 /* ==========================================================================

@@ -343,3 +343,19 @@ func TestAppExportarRelatorioSistema(t *testing.T) {
 		t.Errorf("Relatório deve conter contagem de ajustes:\n%s", relatorio)
 	}
 }
+
+func TestAppFlushingRede(t *testing.T) {
+	app := novoAppTeste(t)
+	res := app.FlushingRede()
+	if res.Mensagem == "" {
+		t.Errorf("FlushingRede retornou mensagem vazia: %+v", res)
+	}
+}
+
+func TestAppMatrizPingJogos(t *testing.T) {
+	app := novoAppTeste(t)
+	res := app.MatrizPingJogos()
+	if len(res) == 0 {
+		t.Errorf("MatrizPingJogos retornou 0 regiões: %+v", res)
+	}
+}

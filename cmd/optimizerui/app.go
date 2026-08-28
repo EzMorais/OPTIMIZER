@@ -778,6 +778,20 @@ func (a *App) obterDNSRunner() netdiag.DNSRunner {
 	return netdiag.LiveDNSRunner{}
 }
 
+// FlushingRede executa a limpeza de cache DNS, renovação DHCP e reset do Winsock.
+func (a *App) FlushingRede() netdiag.ResultadoFlushRede {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	return netdiag.ExecutarFlushRede(ctx)
+}
+
+// MatrizPingJogos avalia o tempo de resposta simultâneo para os principais nós de jogos globais.
+func (a *App) MatrizPingJogos() []netdiag.RegiaoPing {
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+	return netdiag.MedirMatrizJogos(ctx)
+}
+
 // ResultadoLimpezaPnp resume os nós removidos.
 type ResultadoLimpezaPnp struct {
 	Removidos int      `json:"removidos"`

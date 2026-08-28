@@ -1144,6 +1144,142 @@ function comparativoHTML(c) {
   </div>`;
 }
 
+/* ==========================================================================
+   Benchmark de DNS (Base GRC Benchmark) & Aplicação em 1 Clique
+   ========================================================================== */
+
+async function carregarDNSAtual() {
+  const container = $("#dns-atual");
+  if (!container) return;
+
+  try {
+    const atual = await App.ObterDNSAtual();
+    if (!atual || atual.erro) {
+      container.innerHTML = `
+        <div>
+          <span class="dns-current-label">DNS Atual</span>
+          <span>${esc(atual?.erro || "Não foi possível identificar o DNS da conexão ativa.")}</span>
+        </div>
+        <button class="btn-secondary small-btn" id="btn-atualizar-dns">Recarregar</button>
+      `;
+    } else {
+      const ips = (atual.servidores && atual.servidores.length) ? atual.servidores.join(", ") : "Obtido via DHCP / Roteador";
+      container.innerHTML = `
+        <div>
+          <span class="dns-current-label">DNS Ativo (${esc(atual.interface)})</span>
+          <strong>${esc(ips)}</strong>
+        </div>
+        <button class="btn-secondary small-btn" id="btn-atualizar-dns">Recarregar</button>
+      `;
+    }
+    const btn = $("#btn-atualizar-dns");
+    if (btn) btn.addEventListener("click", carregarDNSAtual);
+  } catch (e) {
+    container.innerHTML = `<div><span class="dns-current-label">DNS Atual</span><span>${esc(String(e))}</span></div>`;
+  }
+}
+
+async function testarDNS() {
+  const btn = $("#btn-testar-dns");
+  const container = $("#dns-resultado");
+  if (btn) btn.disabled = true;
+  if (container) {
+    container.innerHTML = `<div class="health-loading"><span class="pulse-spinner"></span><span>Executando benchmark de 12 servidores DNS do GRC Benchmark…</span></div>`;
+  }
+
+  Visualizer.show();
+  Visualizer.log({ type: "net", msg: "Iniciando benchmark de resolução de nomes DNS (Base GRC)..." });
+
+  try {
+    const provedores = await App.BenchmarkDNS();
+    if (!provedores || provedores.length === 0) {
+      if (container) container.innerHTML = `<p class="muted-text">Nenhum provedor DNS respondeu ao teste.</p>`;
+      return;
+    }
+
+    if (container) {
+      container.innerHTML = `
+        <div class="data-table-wrap" style="max-height: 420px; overflow-y: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Provedor DNS (GRC Benchmark)</th>
+                <th>Privacidade & Segurança</th>
+                <th>Tempo de Resposta (RTT)</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${provedores.map((p) => {
+                let badgeColor = "#10b981";
+                if (p.avgRttMs > 60) badgeColor = "#3b82f6";
+                if (p.avgRttMs > 120) badgeColor = "#f59e0b";
+                if (p.avgRttMs >= 999) badgeColor = "#ef4444";
+
+                const rttStr = p.avgRttMs < 999 ? `${p.avgRttMs} ms` : "Falhou";
+                const ipsJson = JSON.stringify(p.ips || []).replace(/"/g, "&quot;");
+
+                return `
+                  <tr>
+                    <td>
+                      <b>${esc(p.nome)}</b>
+                      <div class="field-hint" style="font-family:var(--font-mono); font-size:11px;">${esc((p.ips || []).join(", "))}</div>
+                    </td>
+                    <td><span class="badge-tag rec">${esc(p.privacidade || 'Padrão')}</span></td>
+                    <td class="mono bold" style="color:${badgeColor}; font-size:1.1rem;">${rttStr}</td>
+                    <td>
+                      <button class="btn-primary small-btn btn-usar-dns" data-ips="${ipsJson}" data-nome="${esc(p.nome)}">
+                        Usar este DNS
+                      </button>
+                    </td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      $$(".btn-usar-dns").forEach((b) => b.addEventListener("click", async () => {
+        try {
+          const ips = JSON.parse(b.dataset.ips.replace(/&quot;/g, '"'));
+          const nome = b.dataset.nome;
+          await usarDNS(ips, nome, b);
+        } catch (e) {
+          toast("Erro ao aplicar DNS: " + e, "err");
+        }
+      }));
+    }
+  } catch (e) {
+    if (container) container.innerHTML = `<p class="danger-text">Erro ao testar DNS: ${esc(String(e))}</p>`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function usarDNS(ips, nome, botao) {
+  if (!ips || !ips.length) return;
+  if (botao) botao.disabled = true;
+  toast(`Configurando ${nome} (${ips.join(", ")}) como DNS ativo…`, "info");
+  Visualizer.log({ type: "write", msg: `Configurando resolvedor DNS para [${ips.join(", ")}]...` });
+
+  try {
+    const res = await App.AplicarDNS(ips);
+    if (res && res.ok) {
+      toast(res.mensagem || "DNS configurado com sucesso.", "ok");
+      Visualizer.log({ type: "apply", msg: `DNS aplicado com sucesso: ${res.mensagem}` });
+      await carregarDNSAtual();
+    } else {
+      toast(res?.mensagem || "Não foi possível alterar o DNS.", "err");
+      Visualizer.log({ type: "fail", msg: `Falha ao configurar DNS: ${res?.mensagem}` });
+    }
+  } catch (e) {
+    toast("Erro ao aplicar DNS: " + e, "err");
+  } finally {
+    if (botao) botao.disabled = false;
+  }
+}
+
 async function testarMatrizJogos() {
   const container = $("#matriz-jogos-container");
   const btn = $("#btn-testar-matriz-jogos");

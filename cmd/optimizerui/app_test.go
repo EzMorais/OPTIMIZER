@@ -33,16 +33,16 @@ func TestAppDiagnosticar(t *testing.T) {
 	app := novoAppTeste(t)
 
 	diagPessoal := app.Diagnosticar("pessoal")
-	if diagPessoal.Total != 15 {
-		t.Errorf("Total pessoal = %d, esperado 15", diagPessoal.Total)
+	if diagPessoal.Total != 25 {
+		t.Errorf("Total pessoal = %d, esperado 25", diagPessoal.Total)
 	}
 	if diagPessoal.Perfil != "pessoal" {
 		t.Errorf("Perfil = %s, esperado pessoal", diagPessoal.Perfil)
 	}
 
 	diagTrabalho := app.Diagnosticar("trabalho")
-	if diagTrabalho.Total != 14 {
-		t.Errorf("Total trabalho = %d, esperado 14", diagTrabalho.Total)
+	if diagTrabalho.Total != 19 {
+		t.Errorf("Total trabalho = %d, esperado 19", diagTrabalho.Total)
 	}
 	if diagTrabalho.Perfil != "trabalho" {
 		t.Errorf("Perfil = %s, esperado trabalho", diagTrabalho.Perfil)

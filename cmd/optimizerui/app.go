@@ -7,12 +7,14 @@ import (
 	"sort"
 	"time"
 
+	"optimizer/internal/diskdiag"
 	"optimizer/internal/elevate"
 	"optimizer/internal/engine"
 	"optimizer/internal/history"
 	"optimizer/internal/netdiag"
 	"optimizer/internal/profiles"
 	"optimizer/internal/restore"
+	"optimizer/internal/systemdiag"
 	"optimizer/internal/tweak"
 	"optimizer/internal/tweaks"
 	"optimizer/internal/winreg"
@@ -554,3 +556,95 @@ func (a *App) RelatorioComparativo(antes, depois BenchmarkUI) ComparativoUI {
 		Interpretacao: delta.Interpretation,
 	}
 }
+
+// ---------------------------------------------------------------- Novos Módulos
+
+// ListarInicializacao lista programas configurados para iniciar com o Windows.
+func (a *App) ListarInicializacao() []systemdiag.StartupItem {
+	b := winreg.NewLive()
+	itens, err := systemdiag.ListarStartupItems(b)
+	if err != nil {
+		return []systemdiag.StartupItem{}
+	}
+	return itens
+}
+
+// AlternarInicializacao ativa ou desativa um programa de inicialização.
+func (a *App) AlternarInicializacao(id string, ativar bool) string {
+	b := winreg.NewLive()
+	err := systemdiag.AlternarStartup(b, id, ativar)
+	if err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+// AuditarReparo executa auditoria somente leitura de integridade do sistema (DISM/SFC).
+func (a *App) AuditarReparo() systemdiag.RepairAuditReport {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	return systemdiag.ExecutarAuditoriaIntegridade(ctx)
+}
+
+// ListarPlanosEnergia lista os esquemas de energia do Windows.
+func (a *App) ListarPlanosEnergia() []systemdiag.PowerPlan {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	planos, err := systemdiag.ListarPlanosEnergia(ctx)
+	if err != nil {
+		return []systemdiag.PowerPlan{}
+	}
+	return planos
+}
+
+// AtivarPlanoEnergia define o plano de energia ativo pelo GUID.
+func (a *App) AtivarPlanoEnergia(guid string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := systemdiag.AtivarPlanoEnergia(ctx, guid)
+	if err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+// ListarDiscos audita e lista os volumes e tipos de mídia instalados.
+func (a *App) ListarDiscos() []diskdiag.DriveInfo {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	drives, err := diskdiag.ListarUnidades(ctx)
+	if err != nil {
+		return []diskdiag.DriveInfo{}
+	}
+	return drives
+}
+
+// ExecutarTRIM executa TRIM seguro na unidade selecionada.
+func (a *App) ExecutarTRIM(drive string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	out, err := diskdiag.ExecutarTRIM(ctx, drive)
+	if err != nil {
+		return fmt.Sprintf("Erro ao executar TRIM: %v\n%s", err, out)
+	}
+	return out
+}
+
+// ExecutarChkdsk executa verificação online não destrutiva (chkdsk /scan).
+func (a *App) ExecutarChkdsk(drive string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	out, err := diskdiag.ExecutarChkdskScan(ctx, drive)
+	if err != nil {
+		return fmt.Sprintf("Verificação concluída com observações:\n%s", out)
+	}
+	return out
+}
+
+// BenchmarkDNS executa comparação de tempo de resposta dos principais provedores DNS globais.
+func (a *App) BenchmarkDNS() []netdiag.DNSProvider {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	return netdiag.BenchmarkDNS(ctx, nil)
+}
+

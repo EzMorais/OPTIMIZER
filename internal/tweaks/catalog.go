@@ -62,9 +62,14 @@ const (
 	pathTcpip           = `SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`
 	pathGraphicsDrivers = `SYSTEM\CurrentControlSet\Control\GraphicsDrivers`
 	pathGameBar         = `Software\Microsoft\GameBar`
-	pathFileSystem      = `SYSTEM\CurrentControlSet\Control\FileSystem`
-	pathSearchPolicy    = `SOFTWARE\Policies\Microsoft\Windows\Windows Search`
-	pathExplorerPolicy  = `Software\Policies\Microsoft\Windows\Explorer`
+	pathFileSystem          = `SYSTEM\CurrentControlSet\Control\FileSystem`
+	pathSearchPolicy        = `SOFTWARE\Policies\Microsoft\Windows\Windows Search`
+	pathExplorerPolicy      = `Software\Policies\Microsoft\Windows\Explorer`
+	pathAccessibilitySticky = `Control Panel\Accessibility\StickyKeys`
+	pathAccessibilityToggle = `Control Panel\Accessibility\ToggleKeys`
+	pathAccessibilityFilter = `Control Panel\Accessibility\Keyboard Response`
+	pathBackgroundAccess    = `Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications`
+	pathStorageSense        = `Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy`
 )
 
 func entries() []entry {
@@ -466,6 +471,227 @@ func entries() []entry {
 				Caveat:             "Pensado para PC de trabalho ou compartilhado. Em PC pessoal de quem joga, prefira o ajuste por usuário — este aqui vale para todo mundo que usa a máquina.",
 				Evidence:           "docs/catalogo/registro.md#xbox-game-bar--game-dvr",
 				SortOrder:          100,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "visual.anim-controles",
+				DisplayName: "Desativar animações de controles e elementos dentro das janelas",
+				Explanation: "Remove animações e transições internas de caixas de diálogo, listas e controles de janelas para respostas visuais instantâneas.",
+				Cat:            tweak.CategoryVisualEffects,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "As animações internas de controles estão desativadas.",
+				NotAppliedText: "As animações internas de controles estão ativas.",
+			},
+			values: []regtweak.Value{
+				regtweak.String(winreg.HKCU, pathWindowMetrics, "MinAnimate", "0", "1"),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfilePersonal,
+				Caveat:             "Ajuste estético/responsividade. Elimina atrasos de animação gráfica em menus e controles clássicos.",
+				Evidence:           "https://support.microsoft.com/en-us/accessibility/windows/make-it-easier-to-focus-on-tasks",
+				SortOrder:          25,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "visual.fade-menus",
+				DisplayName: "Desativar transição suave e rolagem lenta de menus (Smooth Scroll)",
+				Explanation: "Desativa o efeito de esmaecimento (fade/slide) e rolagem suave de menus e caixas de ferramentas.",
+				Cat:            tweak.CategoryVisualEffects,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "A rolagem e transição suave de menus está desligada.",
+				NotAppliedText: "A transição suave de menus está ativa.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKCU, pathDesktop, "SmoothScroll", 0, 1),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfileBoth,
+				Caveat:             "Melhora a sensação de agilidade imediata ao navegar em listas e menus suspensos.",
+				Evidence:           "https://support.microsoft.com/en-us/accessibility/windows/make-it-easier-to-focus-on-tasks",
+				SortOrder:          26,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "visual.sombras-janelas",
+				DisplayName: "Desativar sombras sob janelas e ícones",
+				Explanation: "Remove o efeito de sombra projetada sob as janelas e rótulos de ícones da área de trabalho, poupando composição gráfica.",
+				Cat:            tweak.CategoryVisualEffects,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "As sombras sob janelas e ícones estão desativadas.",
+				NotAppliedText: "As sombras sob janelas estão ativas.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKCU, pathExplorerAdv, "ListviewShadow", 0, 1),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfileBoth,
+				Caveat:             "Dá um aspecto visual limpo e plano (flat) à interface, reduzindo ligeiramente o uso do compositor DWM.",
+				Evidence:           "https://support.microsoft.com/en-us/accessibility/windows/make-it-easier-to-focus-on-tasks",
+				SortOrder:          27,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "visual.rastros-mouse",
+				DisplayName: "Garantir rastros do ponteiro do mouse desativados",
+				Explanation: "Garante que o rastro visual do ponteiro do mouse esteja completamente desligado para evitar interferência visual em jogos e precisão gráfica.",
+				Cat:            tweak.CategoryVisualEffects,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O rastro do ponteiro do mouse está desligado.",
+				NotAppliedText: "O rastro do ponteiro do mouse está ativo.",
+			},
+			values: []regtweak.Value{
+				regtweak.String(winreg.HKCU, pathMouse, "MouseTrails", "0", "0"),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				Caveat:             "Rastros do mouse são recursos de acessibilidade para telas antigas ou baixa visão; em jogos causam atraso e artefatos de renderização.",
+				Evidence:           "https://support.microsoft.com/en-us/windows/hardware/input-devices/change-mouse-settings",
+				SortOrder:          28,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "jogos.windowed-optimizations",
+				DisplayName: "Ativar otimizações para jogos em modo janela (Windows 11)",
+				Explanation: "Habilita o modelo moderno de apresentação de flip para jogos em janela e sem borda (DX10/DX11), reduzindo latência de frame e permitindo Auto HDR e taxa de atualização variável.",
+				Cat:            tweak.CategoryGaming,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "As otimizações para jogos em janela estão ativadas.",
+				NotAppliedText: "As otimizações para jogos em janela estão desativadas.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKCU, pathGameConfig, "GameDVR_DXGIHonorFSEWindowsCompatible", 1, 0),
+				regtweak.DWord(winreg.HKCU, pathGameConfig, "GameDVR_DSEBehavior", 2, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfilePersonal,
+				Caveat:             "Recurso nativo oficial do Windows 11. Reduz o input lag ao jogar em modo janela sem borda ao equiparar a latência ao modo tela cheia exclusiva.",
+				Evidence:           "https://support.microsoft.com/en-us/windows/hardware/display-graphics/optimizations-for-windowed-games-in-windows-11",
+				SortOrder:          35,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "sistema.background-apps-off",
+				DisplayName: "Desativar execução de aplicativos padrão em segundo plano",
+				Explanation: "Impede que aplicativos UWP empacotados continuem rodando silenciosamente e consumindo ciclos de CPU e RAM quando fechados.",
+				Cat:            tweak.CategorySystem,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "Aplicativos em segundo plano estão desativados.",
+				NotAppliedText: "Aplicativos em segundo plano têm permissão para rodar.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKCU, pathBackgroundAccess, "GlobalUserDisabled", 1, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfileBoth,
+				Caveat:             "Pode pausar notificações ao vivo de aplicativos como Email ou Calculadora quando eles não estiverem abertos na tela.",
+				Evidence:           "https://support.microsoft.com/ro-ro/windows/experience/performance-optimization/tips-to-improve-pc-performance-in-windows",
+				SortOrder:          45,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "sistema.storage-sense-on",
+				DisplayName: "Ativar Sensor de Armazenamento (Storage Sense automático)",
+				Explanation: "Ativa a rotina oficial do Windows para liberar automaticamente espaço em disco excluindo arquivos temporários desnecessários.",
+				Cat:            tweak.CategoryStorage,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O Sensor de Armazenamento está ativado.",
+				NotAppliedText: "O Sensor de Armazenamento está desativado.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKCU, pathStorageSense, "01", 1, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				Caveat:             "Recurso oficial e altamente recomendado pela Microsoft para prevenir acúmulo de arquivos temporários em SSDs.",
+				Evidence:           "https://learn.microsoft.com/en-us/windows/configuration/storage/storage-sense",
+				SortOrder:          46,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "entrada.sticky-keys-off",
+				DisplayName: "Desativar atalho de Teclas de Aderência (Sticky Keys ao pressionar Shift 5x)",
+				Explanation: "Desativa o popup que interrompe jogos em tela cheia quando a tecla Shift é pressionada cinco vezes consecutivas.",
+				Cat:            tweak.CategoryInput,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O atalho de Teclas de Aderência está desativado.",
+				NotAppliedText: "O atalho de Teclas de Aderência está ativo (padrão 5x Shift).",
+			},
+			values: []regtweak.Value{
+				regtweak.String(winreg.HKCU, pathAccessibilitySticky, "Flags", "504", "506"),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfilePersonal,
+				Caveat:             "Aviso de Acessibilidade: Desative apenas se você não utiliza o recurso de teclas de aderência para assistência motora ao digitar.",
+				Evidence:           "https://support.microsoft.com/en-us/accessibility/windows/make-your-mouse-keyboard-and-other-input-devices-easier-to-use",
+				SortOrder:          55,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "entrada.toggle-keys-off",
+				DisplayName: "Desativar atalho de Teclas de Alternância (Toggle Keys ao segurar NumLock)",
+				Explanation: "Desativa o bip e aviso sonoro ao segurar a tecla NumLock por 5 segundos.",
+				Cat:            tweak.CategoryInput,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O atalho de Teclas de Alternância está desativado.",
+				NotAppliedText: "O atalho de Teclas de Alternância está ativo.",
+			},
+			values: []regtweak.Value{
+				regtweak.String(winreg.HKCU, pathAccessibilityToggle, "Flags", "50", "58"),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfilePersonal,
+				Caveat:             "Recurso de acessibilidade para feedback sonoro. Seguro para desativar em máquinas de uso comum e jogos.",
+				Evidence:           "https://support.microsoft.com/en-us/accessibility/windows/make-your-mouse-keyboard-and-other-input-devices-easier-to-use",
+				SortOrder:          56,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:     "entrada.filter-keys-off",
+				DisplayName: "Desativar atalho de Teclas de Filtragem (Filter Keys ao segurar Shift)",
+				Explanation: "Impede o travamento de repetição de teclas ao segurar a tecla Shift direita por 8 segundos durante jogos ou digitação rápida.",
+				Cat:            tweak.CategoryInput,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O atalho de Teclas de Filtragem está desativado.",
+				NotAppliedText: "O atalho de Teclas de Filtragem está ativo.",
+			},
+			values: []regtweak.Value{
+				regtweak.String(winreg.HKCU, pathAccessibilityFilter, "Flags", "120", "122"),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfilePersonal,
+				Caveat:             "Aviso de Acessibilidade: Indicado para evitar que o teclado seja travado acidentalmente ao segurar teclas em jogos competitivos.",
+				Evidence:           "https://support.microsoft.com/en-us/accessibility/windows/make-your-mouse-keyboard-and-other-input-devices-easier-to-use",
+				SortOrder:          57,
 			},
 		},
 	}

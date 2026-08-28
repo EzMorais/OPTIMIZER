@@ -35,16 +35,14 @@
     </div>
   </div>
 
-  <div class="header-right-actions">
-    <!-- Botão de Acesso ao Visualizador em Tempo Real -->
-    <button class="visualizer-toggle-btn" id="btn-toggle-visualizer" title="Abrir Visualizador de Registro e Telemetria em Tempo Real">
+  <div class="header-right">
+    <button class="visualizer-toggle-btn" id="btn-toggle-visualizer" title="Abrir Inspetor e Terminal de Operações em Tempo Real">
       <span class="radar-dot"></span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
       <span>Visualizador</span>
-      <span class="vis-count-badge" id="vis-event-count">0 ops</span>
+      <span class="vis-badge" id="vis-event-count">0 ops</span>
     </button>
-
-    <div class="admin-slot" id="admin-area"></div>
+    <div id="admin-area"></div>
   </div>
 </header>
 
@@ -56,9 +54,17 @@
       <span>Otimizações</span>
       <span class="tab-badge" id="tab-badge-otim">0</span>
     </button>
+    <button class="nav-tab" data-view="startup" id="tab-startup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <span>Inicialização</span>
+    </button>
+    <button class="nav-tab" data-view="disco" id="tab-disco">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+      <span>Disco & Reparo</span>
+    </button>
     <button class="nav-tab" data-view="rede" id="tab-rede">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-      <span>Internet & Rede</span>
+      <span>Internet & DNS</span>
     </button>
     <button class="nav-tab" data-view="hist" id="tab-hist">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -70,7 +76,7 @@
 <!-- Conteúdo Principal -->
 <main class="content-viewport">
 
-  <!-- ==================== ABA 1: OTIMIZAÇÕES ==================== -->
+  <!-- ==================== ABA 1: OTIMIZAÇÕES (6 CATEGORIAS) ==================== -->
   <section id="view-otim" class="view-panel on">
 
     <!-- Card de Saúde e Status -->
@@ -116,9 +122,94 @@
     <div class="tweaks-container" id="lista"></div>
   </section>
 
-  <!-- ==================== ABA 2: INTERNET & REDE ==================== -->
+  <!-- ==================== ABA 2: INICIALIZAÇÃO & APPS ==================== -->
+  <section id="view-startup" class="view-panel">
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon startup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Gerenciador de Programas na Inicialização</h2>
+          <p class="card-subtitle">Controle os softwares que iniciam automaticamente com o Windows para acelerar a inicialização do PC.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-recarregar-startup">Recarregar</button>
+        </div>
+      </div>
+
+      <div class="startup-list" id="lista-startup" style="margin-top:16px;">
+        <p class="muted-text">Carregando programas de inicialização…</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ABA 3: DISCO & REPARO ==================== -->
+  <section id="view-disco" class="view-panel">
+    
+    <!-- Diagnóstico de Unidades -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon disk">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Saúde das Unidades & TRIM Seguro</h2>
+          <p class="card-subtitle">Identificação inteligente de SSDs (TRIM) e HDDs (Desfragmentação) para maximizar a vida útil e velocidade de leitura.</p>
+        </div>
+      </div>
+
+      <div class="drives-grid" id="lista-drives" style="margin-top:16px;">
+        <p class="muted-text">Carregando informações de disco…</p>
+      </div>
+    </div>
+
+    <!-- Central de Reparo DISM / SFC -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon repair">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Central de Diagnóstico & Integridade de Sistema</h2>
+          <p class="card-subtitle">Auditoria não-destrutiva de integridade via DISM e SFC (Verificação de arquivos protegidos sem alterações cegas).</p>
+        </div>
+      </div>
+
+      <div class="action-inline-form" style="margin-top:14px;">
+        <button class="btn-primary" id="btn-auditar-reparo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+          Auditar Integridade do Windows
+        </button>
+      </div>
+      <p class="field-hint">Executa `DISM /CheckHealth` e `sfc /verifyonly` em modo somente leitura.</p>
+      <div id="reparo-resultado" style="margin-top:14px;"></div>
+    </div>
+  </section>
+
+  <!-- ==================== ABA 4: INTERNET & DNS ==================== -->
   <section id="view-rede" class="view-panel">
     
+    <!-- Benchmark de DNS & DoH -->
+    <div class="glass-card">
+      <div class="card-header">
+        <div class="card-header-icon dns">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Benchmark de DNS & Suporte DoH (DNS-over-HTTPS)</h2>
+          <p class="card-subtitle">Mede o tempo real de resposta dos servidores DNS mais rápidos e seguros do mundo.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-testar-dns">Testar Servidores DNS</button>
+        </div>
+      </div>
+
+      <div id="dns-resultado" style="margin-top:16px;">
+        <p class="muted-text">Clique em "Testar Servidores DNS" para medir a velocidade de resolução.</p>
+      </div>
+    </div>
+
     <!-- Teste de MTU -->
     <div class="glass-card">
       <div class="card-header">
@@ -134,7 +225,7 @@
       <div class="action-inline-form">
         <div class="input-with-label">
           <label for="destino">Servidor de teste</label>
-          <input id="destino" type="text" value="8.8.8.8" spellcheck="false" placeholder="Ex: 8.8.8.8 ou 1.1.1.1">
+          <input id="destino" type="text" value="1.1.1.1" spellcheck="false" placeholder="Ex: 1.1.1.1 ou 8.8.8.8">
         </div>
         <button class="btn-primary" id="btn-medir">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -178,7 +269,7 @@
       <div class="action-inline-form">
         <div class="input-with-label">
           <label for="destino-latencia">Host de teste</label>
-          <input id="destino-latencia" type="text" value="8.8.8.8" spellcheck="false">
+          <input id="destino-latencia" type="text" value="1.1.1.1" spellcheck="false">
         </div>
         <div class="btn-group">
           <button class="btn-secondary" id="btn-medir-antes">
@@ -197,7 +288,7 @@
     </div>
   </section>
 
-  <!-- ==================== ABA 3: HISTÓRICO ==================== -->
+  <!-- ==================== ABA 5: HISTÓRICO ==================== -->
   <section id="view-hist" class="view-panel">
     <div class="glass-card">
       <div class="card-header">
@@ -223,115 +314,122 @@
 
 </main>
 
-<!-- Barra Flutuante de Ações (Floating Action Dock) -->
-<footer class="floating-dock" id="barra">
-  <div class="dock-left">
-    <div class="selected-badge" id="selected-badge">
-      <span class="selected-count" id="selected-count">0</span>
-      <span class="selected-label">selecionados</span>
+<!-- Barra Flutuante de Ações (Dock) -->
+<div class="floating-dock-wrap" id="barra">
+  <div class="floating-dock">
+    <div class="dock-left">
+      <div class="dock-badge" id="selected-badge">
+        <span class="dock-badge-num" id="selected-count">0</span>
+        <span class="dock-badge-text" id="selected-label">selecionados</span>
+      </div>
+      <label class="dock-checkbox" id="wrap-restauracao" title="Cria um ponto seguro via SrClient.dll antes de aplicar qualquer alteração">
+        <input type="checkbox" id="ponto-restauracao" checked>
+        <span class="dock-checkbox-custom"></span>
+        <span>Criar Ponto de Restauração</span>
+      </label>
     </div>
 
-    <label class="custom-switch-label" id="wrap-restauracao" hidden>
-      <input type="checkbox" id="ponto-restauracao" class="custom-switch-input">
-      <span class="custom-switch-slider"></span>
-      <span class="custom-switch-text">Ponto de Restauração</span>
-    </label>
+    <div class="dock-right">
+      <button class="dock-btn secondary" id="btn-recomendados" title="Marcar todos os ajustes seguros de alto ganho">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Recomendados
+      </button>
+      <button class="dock-btn outline" id="btn-simular" title="Testar e auditar alterações sem gravar nada no registro">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        Simular
+      </button>
+      <button class="dock-btn primary" id="btn-aplicar" disabled title="Gravar alterações selecionadas com snapshot e backup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Aplicar
+      </button>
+      <button class="dock-btn danger" id="btn-desfazer-tudo" disabled title="Reverter todas as configurações para o estado original">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Desfazer Tudo
+      </button>
+    </div>
   </div>
+</div>
 
-  <div class="dock-right">
-    <button class="dock-btn secondary" id="btn-recomendados">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-      Marcar Recomendados
-    </button>
-    <button class="dock-btn secondary" id="btn-simular">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-      Simular
-    </button>
-    <button class="dock-btn primary" id="btn-aplicar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>
-      Aplicar Selecionados
-    </button>
-    <button class="dock-btn danger" id="btn-desfazer-tudo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-      Desfazer Tudo
-    </button>
-  </div>
-</footer>
-
-<!-- ==========================================================================
-     VISUALIZADOR EM TEMPO REAL (LIVE REGISTRY & SYSTEM INSPECTOR)
-     ========================================================================== -->
-<div class="visualizer-drawer" id="visualizer-drawer" hidden>
+<!-- ==================== VISUALIZADOR DE OPERAÇÕES & TELEMETRIA ==================== -->
+<aside class="visualizer-drawer" id="visualizer-drawer" hidden aria-label="Visualizador de Operações">
   <div class="vis-header">
     <div class="vis-header-left">
-      <span class="radar-dot live"></span>
-      <h3 class="vis-title">Visualizador de Operações & Registro</h3>
-      <span class="vis-tag">Telemetria ao Vivo</span>
+      <span class="radar-dot active"></span>
+      <span class="vis-title">Inspetor e Telemetria de Sistema</span>
+      <div class="vis-tabs">
+        <button class="vis-tab on" data-vistab="stream">Terminal de Operações</button>
+        <button class="vis-tab" data-vistab="diff">Diff de Chaves & Registro</button>
+      </div>
     </div>
-
-    <div class="vis-nav-tabs">
-      <button class="vis-tab on" data-vistab="stream">Terminal de Operações</button>
-      <button class="vis-tab" data-vistab="diff">Diff de Chaves & Registro</button>
-    </div>
-
     <div class="vis-header-right">
-      <button class="vis-action-btn" id="btn-vis-copiar" title="Copiar logs formatados">
+      <label class="vis-auto-scroll" title="Rolar automaticamente para a última operação">
+        <input type="checkbox" id="chk-vis-autoscroll" checked>
+        <span>Auto-scroll</span>
+      </label>
+      <button class="vis-btn-icon" id="btn-vis-copiar" title="Copiar log completo para a área de transferência">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         Copiar
       </button>
-      <button class="vis-action-btn" id="btn-vis-limpar" title="Limpar logs">
+      <button class="vis-btn-icon" id="btn-vis-limpar" title="Limpar logs">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         Limpar
       </button>
-      <button class="vis-close-btn" id="btn-vis-fechar" title="Minimizar visualizador">&times;</button>
+      <button class="vis-close-btn" id="btn-vis-fechar" title="Fechar visualizador">&times;</button>
     </div>
   </div>
 
   <div class="vis-body">
-    <!-- Tab 1: Terminal Stream -->
+    <!-- Sub-aba 1: Stream de Terminal -->
     <div class="vis-tab-content on" id="vistab-stream">
       <div class="vis-terminal-stream" id="vis-stream-log">
-        <div class="vis-log-empty">Nenhuma operação registrada nesta sessão. Inicie um diagnóstico ou aplique uma otimização para ver a telemetria ao vivo.</div>
+        <div class="vis-log-empty">Nenhuma operação realizada ainda. Use Diagnosticar ou Aplicar para ver o fluxo em tempo real.</div>
       </div>
     </div>
 
-    <!-- Tab 2: Visual Registry Diff Cards -->
+    <!-- Sub-aba 2: Visual Diff -->
     <div class="vis-tab-content" id="vistab-diff">
-      <div class="vis-diff-grid" id="vis-diff-container">
-        <div class="vis-log-empty">Selecione e aplique ou simule ajustes para inspecionar os diffs de registro em tempo real.</div>
+      <div class="vis-diff-container" id="vis-diff-container">
+        <div class="vis-log-empty">Nenhum diff ativo no momento.</div>
       </div>
     </div>
   </div>
 
   <div class="vis-footer">
-    <div class="vis-stats-row">
-      <span class="vis-stat-item">Consultas (Leituras): <b id="stat-reads">0</b></span>
-      <span class="vis-stat-item">Modificações (Escritas): <b id="stat-writes">0</b></span>
-      <span class="vis-stat-item">Snapshots Seguros: <b id="stat-snaps">0</b></span>
-      <span class="vis-stat-item">Tempo Médio: <b id="stat-avgtime">0.2 ms</b></span>
+    <div class="vis-stat-item">
+      <span class="vis-stat-label">Consultas (Leituras):</span>
+      <span class="vis-stat-val" id="stat-reads">0</span>
     </div>
-    <div class="vis-autoscroll-toggle">
-      <label><input type="checkbox" id="chk-vis-autoscroll" checked> Auto-rolagem</label>
+    <div class="vis-stat-item">
+      <span class="vis-stat-label">Modificações (Escritas):</span>
+      <span class="vis-stat-val" id="stat-writes">0</span>
+    </div>
+    <div class="vis-stat-item">
+      <span class="vis-stat-label">Snapshots Seguros:</span>
+      <span class="vis-stat-val" id="stat-snaps">0</span>
+    </div>
+    <div class="vis-stat-item">
+      <span class="vis-stat-label">Tempo Médio de Resposta:</span>
+      <span class="vis-stat-val" id="stat-avgtime">0.2 ms</span>
     </div>
   </div>
-</div>
+</aside>
 
-<!-- Modal de Resultados com Backdrop Blur -->
+<!-- Modal de Resultados / Diálogo Genérico -->
 <div class="modal-overlay" id="overlay" hidden>
-  <div class="modal-dialog">
+  <div class="modal-card">
     <div class="modal-header">
-      <h3 class="modal-title" id="modal-titulo">Resultado da Operação</h3>
-      <button class="modal-close-icon" id="btn-modal-x">&times;</button>
+      <h3 class="modal-title" id="modal-titulo">Resultado</h3>
+      <button class="modal-close" id="btn-modal-x">&times;</button>
     </div>
-    <div class="modal-content" id="modal-corpo"></div>
+    <div class="modal-body" id="modal-corpo"></div>
     <div class="modal-footer">
-      <button class="dock-btn primary" id="modal-fechar">Fechar (Esc)</button>
+      <button class="btn-primary" id="modal-fechar">Entendido</button>
     </div>
   </div>
 </div>
 
-<!-- Container de Notificações Toast -->
-<div class="toast-wrapper" id="toast-container" aria-live="polite"></div>
+<!-- Container de Toasts -->
+<div class="toast-container" id="toast-container"></div>
 
 <script src="app.js"></script>
 </body>

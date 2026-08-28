@@ -284,9 +284,20 @@ function ligarEventos() {
     
     $("#barra").style.display = viewId === "otim" ? "flex" : "none";
 
+    if (viewId === "startup") carregarStartup();
+    if (viewId === "disco") carregarDiscos();
     if (viewId === "hist") carregarHistorico();
     if (viewId === "rede") carregarPerfis();
   }));
+
+  const btnRecarregarStartup = $("#btn-recarregar-startup");
+  if (btnRecarregarStartup) btnRecarregarStartup.addEventListener("click", carregarStartup);
+
+  const btnAuditarReparo = $("#btn-auditar-reparo");
+  if (btnAuditarReparo) btnAuditarReparo.addEventListener("click", auditarReparo);
+
+  const btnTestarDNS = $("#btn-testar-dns");
+  if (btnTestarDNS) btnTestarDNS.addEventListener("click", testarDNS);
 
   const inputBusca = $("#busca-tweak");
   const btnLimpar = $("#btn-limpar-busca");
@@ -984,6 +995,206 @@ async function carregarHistorico() {
       <div><b>${esc(e.item)}</b> — <span class="card-subtitle">${esc(e.resultado)}</span></div>
     </div>`;
   }).join("");
+}
+
+/* ==========================================================================
+   Inicialização & Programas no Boot
+   ========================================================================== */
+
+async function carregarStartup() {
+  const container = $("#lista-startup");
+  container.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Lendo programas de inicialização…</span></div>';
+  try {
+    const itens = await App.ListarInicializacao();
+    if (!itens || !itens.length) {
+      container.innerHTML = '<div class="empty-results"><p>Nenhum programa configurado para inicializar automaticamente com o Windows.</p></div>';
+      return;
+    }
+
+    container.innerHTML = itens.map((it) => `
+      <div class="tweak-card" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="flex:1; padding-right:16px;">
+          <div class="tweak-header-line">
+            <span class="tweak-name">${esc(it.nome)}</span>
+            <span class="badge-tag rec">${esc(it.origem)}</span>
+          </div>
+          <div class="tweak-desc mono" style="font-size:12px; margin-top:4px; opacity:0.8;">${esc(it.comando)}</div>
+        </div>
+        <label class="switch-control" title="Desativar ou ativar programa na inicialização">
+          <input type="checkbox" class="chk-startup" data-id="${esc(it.id)}" ${it.ativo ? "checked" : ""}>
+          <span class="switch-track"></span>
+        </label>
+      </div>
+    `).join("");
+
+    $$(".chk-startup").forEach((chk) => chk.addEventListener("change", async (e) => {
+      const id = e.target.dataset.id;
+      const ativar = e.target.checked;
+      Visualizer.show();
+      Visualizer.log({
+        type: "write",
+        msg: `${ativar ? "Ativando" : "Desativando"} programa na inicialização: [${id}]`
+      });
+      const err = await App.AlternarInicializacao(id, ativar);
+      if (err) {
+        toast(`Erro ao alterar: ${err}`, "erro");
+        e.target.checked = !ativar;
+      } else {
+        toast(ativar ? "Programa ativado na inicialização." : "Programa desativado da inicialização.", "ok");
+      }
+    }));
+  } catch (e) {
+    container.innerHTML = `<div class="empty-results"><p>Erro ao ler inicialização: ${esc(String(e))}</p></div>`;
+  }
+}
+
+/* ==========================================================================
+   Disco, Armazenamento & Reparo DISM/SFC
+   ========================================================================== */
+
+async function carregarDiscos() {
+  const container = $("#lista-drives");
+  container.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Auditando unidades de disco…</span></div>';
+  try {
+    const drives = await App.ListarDiscos();
+    if (!drives || !drives.length) {
+      container.innerHTML = '<div class="empty-results"><p>Nenhuma unidade detectada.</p></div>';
+      return;
+    }
+
+    container.innerHTML = drives.map((d) => `
+      <div class="glass-card" style="margin-bottom:12px; border-left:3px solid var(--accent);">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h3 class="card-title" style="margin:0;">Unidade ${esc(d.letter)} (${esc(d.label)})</h3>
+            <p class="field-hint" style="margin-top:4px;">Tipo de Mídia: <b>${esc(d.mediaType)}</b> (${esc(d.busType)}) · Saúde SMART: <b>${esc(d.healthStatus)}</b></p>
+          </div>
+          <div style="display:flex; gap:8px;">
+            ${d.supportsTrim ? `<button class="btn-secondary small-btn btn-trim" data-drive="${esc(d.letter)}">Executar TRIM</button>` : ""}
+            <button class="btn-secondary small-btn btn-chkdsk" data-drive="${esc(d.letter)}">chkdsk /scan</button>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    $$(".btn-trim").forEach((btn) => btn.addEventListener("click", async () => {
+      const drv = btn.dataset.drive;
+      btn.disabled = true;
+      btn.textContent = "Executando TRIM…";
+      Visualizer.show();
+      Visualizer.log({ type: "write", msg: `Executando TRIM de manutenção no SSD ${drv}...` });
+      const out = await App.ExecutarTRIM(drv);
+      btn.disabled = false;
+      btn.textContent = "Executar TRIM";
+      abrirModal(`Resultado TRIM (${drv})`, `<div class="terminal-block"><div>${esc(out)}</div></div>`);
+    }));
+
+    $$(".btn-chkdsk").forEach((btn) => btn.addEventListener("click", async () => {
+      const drv = btn.dataset.drive;
+      btn.disabled = true;
+      btn.textContent = "Verificando…";
+      Visualizer.show();
+      Visualizer.log({ type: "read", msg: `Executando chkdsk /scan não destrutivo na unidade ${drv}...` });
+      const out = await App.ExecutarChkdsk(drv);
+      btn.disabled = false;
+      btn.textContent = "chkdsk /scan";
+      abrirModal(`Verificação de Integridade (${drv})`, `<div class="terminal-block"><div>${esc(out)}</div></div>`);
+    }));
+  } catch (e) {
+    container.innerHTML = `<div class="empty-results"><p>Erro ao ler unidades: ${esc(String(e))}</p></div>`;
+  }
+}
+
+async function auditarReparo() {
+  const btn = $("#btn-auditar-reparo");
+  const resEl = $("#reparo-resultado");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="pulse-spinner"></span> Auditando arquivos do Windows…`;
+  resEl.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Executando DISM /CheckHealth e SFC /verifyonly…</span></div>';
+
+  Visualizer.show();
+  Visualizer.log({ type: "read", msg: "Iniciando auditoria de integridade da imagem do Windows (DISM/SFC)..." });
+
+  try {
+    const rep = await App.AuditarReparo();
+    Visualizer.log({
+      type: rep.dismHealthy && rep.sfcHealthy ? "verify" : "fail",
+      msg: `Auditoria concluída: DISM ${rep.dismHealthy ? "OK" : "Inconsistente"}, SFC ${rep.sfcHealthy ? "OK" : "Inconsistente"}`
+    });
+
+    resEl.innerHTML = `
+      <div class="glass-card" style="border-left: 3px solid ${rep.dismHealthy && rep.sfcHealthy ? 'var(--accent)' : 'var(--warn)'}">
+        <h3 class="card-title">${rep.dismHealthy && rep.sfcHealthy ? 'Sistema Saudável e Íntegro' : 'Atenção: Inconsistências Detectadas'}</h3>
+        <p class="card-subtitle">${esc(rep.interpretation)}</p>
+        <div class="terminal-block" style="margin-top:10px;">
+          <div><b>DISM CheckHealth:</b> ${esc(rep.dismOutput || 'Verificado com sucesso')}</div>
+          <div style="margin-top:6px;"><b>SFC VerifyOnly:</b> ${esc(rep.sfcOutput || 'Sem violações de integridade')}</div>
+        </div>
+      </div>`;
+  } catch (e) {
+    resEl.innerHTML = `<div class="empty-results"><p>Erro na auditoria: ${esc(String(e))}</p></div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg> Auditar Integridade do Windows`;
+  }
+}
+
+/* ==========================================================================
+   DNS Benchmark & DoH
+   ========================================================================== */
+
+async function testarDNS() {
+  const btn = $("#btn-testar-dns");
+  const resEl = $("#dns-resultado");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="pulse-spinner"></span> Medindo…`;
+  resEl.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Resolvendo domínios de teste em múltiplos servidores DNS…</span></div>';
+
+  Visualizer.show();
+  Visualizer.log({ type: "net", msg: "Iniciando benchmark de latência DNS nos principais provedores globais..." });
+
+  try {
+    const provs = await App.BenchmarkDNS();
+    for (const p of (provs || [])) {
+      Visualizer.log({
+        type: "net",
+        msg: `DNS [${p.nome}] -> RTT Médio: ${p.avgRttMs}ms (Perda: ${p.perda}%)`
+      });
+    }
+
+    resEl.innerHTML = `
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Provedor DNS</th>
+              <th>IPs</th>
+              <th>RTT Médio</th>
+              <th>Perda</th>
+              <th>Privacidade / Segurança</th>
+              <th>DoH (HTTPS)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(provs || []).map((p) => `
+              <tr class="${p.recomendado ? 'highlight-row' : ''}">
+                <td><b>${esc(p.nome)}</b> ${p.recomendado ? '<span class="badge-tag speed">Mais Rápido</span>' : ''}</td>
+                <td class="mono small">${esc(p.ips.join(', '))}</td>
+                <td class="mono"><b>${p.avgRttMs} ms</b></td>
+                <td class="mono">${p.perda.toFixed(0)}%</td>
+                <td>${esc(p.privacidade)}</td>
+                <td class="mono small">${esc(p.dohUrl)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    resEl.innerHTML = `<div class="empty-results"><p>Erro ao medir DNS: ${esc(String(e))}</p></div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "Testar Servidores DNS";
+  }
 }
 
 if (document.readyState === "loading") {

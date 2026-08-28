@@ -53,6 +53,8 @@ func ListarPerfisUso() []UseProfile {
 				"jogos.hpet-synthetic-timers",
 				"privacidade.nvidia-telemetry-off",
 				"privacidade.win11-recall-off",
+				"privacidade.activity-history-off",
+				"privacidade.telemetry-data-collection-off",
 				"privacidade.content-delivery-suggestions-off",
 			},
 			PowerPlanGUID:   "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", // Alto Desempenho

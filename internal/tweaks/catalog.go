@@ -88,6 +88,8 @@ const (
 	pathNvidiaNvCplOptIn    = `SOFTWARE\NVIDIA Corporation\NvControlPanel2\Client`
 	pathWindowsAI           = `SOFTWARE\Policies\Microsoft\Windows\WindowsAI`
 	pathKernelManager       = `SYSTEM\CurrentControlSet\Control\Session Manager\kernel`
+	pathDataCollection      = `SOFTWARE\Policies\Microsoft\Windows\DataCollection`
+	pathSystemPolicy        = `SOFTWARE\Policies\Microsoft\Windows\System`
 )
 
 func entries() []entry {
@@ -1204,6 +1206,54 @@ func entries() []entry {
 				Caveat:             "Melhora a consistência de frametime e reduz jitter de interrupções de hardware.",
 				Evidence:           "docs/catalogo/hardware-energia-gpu.md#timers",
 				SortOrder:          225,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "privacidade.activity-history-off",
+				DisplayName:    "Desativar publicação e coleta de Histórico de Atividades do usuário",
+				Explanation:    "Impede o Windows de rastrear continuamente os aplicativos abertos e enviar o histórico de atividades para a nuvem.",
+				Cat:            tweak.CategoryPrivacyNonSecurity,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O histórico de atividades do usuário está desativado.",
+				NotAppliedText: "O histórico de atividades do usuário está ativo.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathSystemPolicy, "PublishUserActivities", 0, 1),
+				regtweak.DWord(winreg.HKLM, pathSystemPolicy, "UploadUserActivities", 0, 1),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Evita tráfego em segundo plano e preserva histórico local de privacidade.",
+				Evidence:           "docs/catalogo/privacidade.md#activity-history",
+				SortOrder:          230,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "privacidade.telemetry-data-collection-off",
+				DisplayName:    "Restringir telemetria de diagnóstico do Windows ao nível mínimo (Segurança)",
+				Explanation:    "Limita a coleta de telemetria e diagnóstico do sistema operacional ao nível estritamente obrigatório de segurança, desativando dados opcionais.",
+				Cat:            tweak.CategoryPrivacyNonSecurity,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "Telemetria do sistema reduzida ao nível mínimo de segurança.",
+				NotAppliedText: "Telemetria do sistema no nível padrão (Completo/Opcional).",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathDataCollection, "AllowTelemetry", 0, 1),
+				regtweak.DWord(winreg.HKLM, pathDataCollection, "MaxTelemetryAllowed", 0, 3),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Elimina relatórios contínuos de uso enviados em segundo plano para servidores externos.",
+				Evidence:           "docs/catalogo/privacidade.md#telemetry-datacollection",
+				SortOrder:          235,
 			},
 		},
 	}

@@ -50,16 +50,16 @@ func TestAppDiagnosticar(t *testing.T) {
 	app := novoAppTeste(t)
 
 	diagPessoal := app.Diagnosticar("pessoal")
-	if diagPessoal.Total != 46 {
-		t.Errorf("Total pessoal = %d, esperado 46", diagPessoal.Total)
+	if diagPessoal.Total != 48 {
+		t.Errorf("Total pessoal = %d, esperado 48", diagPessoal.Total)
 	}
 	if diagPessoal.Perfil != "pessoal" {
 		t.Errorf("Perfil = %s, esperado pessoal", diagPessoal.Perfil)
 	}
 
 	diagTrabalho := app.Diagnosticar("trabalho")
-	if diagTrabalho.Total != 32 {
-		t.Errorf("Total trabalho = %d, esperado 32", diagTrabalho.Total)
+	if diagTrabalho.Total != 34 {
+		t.Errorf("Total trabalho = %d, esperado 34", diagTrabalho.Total)
 	}
 	if diagTrabalho.Perfil != "trabalho" {
 		t.Errorf("Perfil = %s, esperado trabalho", diagTrabalho.Perfil)
@@ -250,8 +250,8 @@ func TestAppResumoVisaoMostraCoberturaECategoriasDoCatalogo(t *testing.T) {
 	}
 
 	visao := app.ResumoVisao("pessoal")
-	if visao.TotalAjustes != 46 {
-		t.Errorf("total de ajustes = %d, esperado 46", visao.TotalAjustes)
+	if visao.TotalAjustes != 48 {
+		t.Errorf("total de ajustes = %d, esperado 48", visao.TotalAjustes)
 	}
 	if visao.Aplicados != antes.Aplicados+1 {
 		t.Errorf("aplicados = %d, esperado %d após aplicar um ajuste", visao.Aplicados, antes.Aplicados+1)

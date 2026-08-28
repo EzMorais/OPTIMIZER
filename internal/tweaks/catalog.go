@@ -78,7 +78,6 @@ const (
 	pathMouClass            = `SYSTEM\CurrentControlSet\Services\mouclass\Parameters`
 	pathKbdClass            = `SYSTEM\CurrentControlSet\Services\kbdclass\Parameters`
 	pathDXGKrnl             = `SYSTEM\CurrentControlSet\Services\DXGKrnl`
-	pathGamesLegacy         = `Software\Microsoft\Games`
 	pathUsb                 = `SYSTEM\CurrentControlSet\Services\USB`
 	pathSettingSync         = `Software\Microsoft\Windows\CurrentVersion\SettingSync\Groups\Personalization`
 	pathContentDelivery     = `Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager`
@@ -948,29 +947,6 @@ func entries() []entry {
 				Caveat:             "Reduz a latência de exibição do quadro entre a GPU e a tela em jogos 3D.",
 				Evidence:           "docs/catalogo/hardware-energia-gpu.md#dxgkrnl-latency",
 				SortOrder:          165,
-			},
-		},
-		{
-			spec: regtweak.Spec{
-				TweakID:        "jogos.legacy-multimedia-fps",
-				DisplayName:    "Ativar renderização fluida e contagem de FPS em jogos legados",
-				Explanation:    "Habilita as diretrizes de fluidez gráfica e modo de alta taxa de quadros do subsistema clássico de jogos da Microsoft.",
-				Cat:            tweak.CategoryGaming,
-				RiskLevel:      tweak.RiskLow,
-				NeedsRestart:   false,
-				AppliedText:    "As flags de fluidez para jogos clássicos estão ativadas.",
-				NotAppliedText: "As flags de fluidez para jogos clássicos estão desativadas.",
-			},
-			values: []regtweak.Value{
-				regtweak.DWord(winreg.HKCU, pathGamesLegacy, "FpsAll", 1, 0),
-				regtweak.DWord(winreg.HKCU, pathGamesLegacy, "GameFluidity", 1, 0),
-			},
-			meta: tweak.Meta{
-				RecommendedDefault: false,
-				Profiles:           tweak.ProfilePersonal,
-				Caveat:             "Melhora a resposta em títulos DirectX mais antigos e executáveis legados de jogos.",
-				Evidence:           "docs/catalogo/registro.md#jogos-legados",
-				SortOrder:          170,
 			},
 		},
 		{

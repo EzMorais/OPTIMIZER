@@ -32,7 +32,6 @@ func ListarPerfisUso() []UseProfile {
 				"jogos.windowed-optimizations",
 				"jogos.mmcss-low-latency",
 				"jogos.dxgkrnl-latency-tolerance",
-				"jogos.legacy-multimedia-fps",
 				"visual.hags",
 				"visual.menu-show-delay",
 				"visual.anim-controles",

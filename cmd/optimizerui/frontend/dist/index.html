@@ -83,6 +83,13 @@
       <p class="hero-subtitle">Aplicação transacional e segura com rollback atômico. Ajustes manuais individuais nunca são afetados pela troca de perfil.</p>
     </div>
 
+    <section class="overview-card" id="visao-geral" aria-live="polite">
+      <div class="overview-loading">
+        <span class="pulse-spinner"></span>
+        <span>Preparando a visão geral do catálogo…</span>
+      </div>
+    </section>
+
     <div class="use-profiles-grid">
       
       <!-- Card JOGO -->
@@ -257,6 +264,11 @@
         </div>
       </div>
 
+      <div class="dns-current-card" id="dns-atual" aria-live="polite">
+        <span class="pulse-spinner"></span>
+        <span>Lendo o DNS usado pela conexão ativa…</span>
+      </div>
+
       <div id="dns-resultado" style="margin-top:16px;">
         <p class="muted-text">Clique em "Testar Servidores DNS" para medir a velocidade de resolução.</p>
       </div>
@@ -384,7 +396,7 @@
         <div class="latency-card">
           <div class="lat-label">Medição ATUAL</div>
           <div class="lat-val" id="lat-depois-val">—</div>
-          <button class="btn-secondary small-btn" id="btn-medir-depois">Medir Agora</button>
+          <button class="btn-secondary small-btn" id="btn-medir-depois" disabled>Medir Agora</button>
         </div>
       </div>
       <div id="comparativo-resultado" style="margin-top:14px;"></div>

@@ -245,6 +245,10 @@ function fecharModal() {
    Eventos & Atalhos de Teclado
    ========================================================================== */
 
+function deveDiagnosticarAoAbrirAjustes(diagnostico) {
+  return !Array.isArray(diagnostico?.itens) || diagnostico.itens.length === 0;
+}
+
 function ligarEventos() {
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
@@ -307,11 +311,14 @@ function ligarEventos() {
       atualizarMetricasCPU();
       if (!cpuTimer) cpuTimer = setInterval(atualizarMetricasCPU, 1500);
     }
-    if (viewId === "otim") {
-      if (!itens.length) diagnosticar();
+    if (viewId === "otim" && deveDiagnosticarAoAbrirAjustes(ultimoDiagnostico)) {
+      diagnosticar();
     }
     if (viewId === "hist") carregarHistorico();
-    if (viewId === "rede") carregarPerfis();
+    if (viewId === "rede") {
+      carregarPerfis();
+      carregarDNSAtual();
+    }
   }));
 
   // Listeners de Perfis de Uso
@@ -415,6 +422,13 @@ async function diagnosticar() {
   const d = await App.Diagnosticar(perfil);
   ultimoDiagnostico = d;
 
+  try {
+    renderVisaoGeral(await App.ResumoVisao(perfil));
+  } catch (e) {
+    const painel = $("#visao-geral");
+    if (painel) painel.innerHTML = '<p class="overview-unavailable">A vis\u00e3o geral estar\u00e1 dispon\u00edvel na pr\u00f3xima atualiza\u00e7\u00e3o.</p>';
+  }
+
   // Stream de eventos simulados da leitura de cada chave do registro
   if (d.itens && d.itens.length) {
     for (const it of d.itens) {
@@ -438,8 +452,10 @@ async function diagnosticar() {
   const btnElevar = $("#btn-elevar");
   if (btnElevar) btnElevar.addEventListener("click", elevar);
 
-  $("#wrap-restauracao").hidden = !d.admin;
-  $("#hist-caminho").textContent = d.caminhoHistorico;
+  const restauracao = $("#wrap-restauracao");
+  if (restauracao) restauracao.hidden = !d.admin;
+  const caminhoHistorico = $("#hist-caminho");
+  if (caminhoHistorico) caminhoHistorico.textContent = d.caminhoHistorico;
   $("#tab-badge-otim").textContent = d.total || 0;
 
   const total = d.total || 0;
@@ -485,6 +501,77 @@ async function diagnosticar() {
   atualizarLista();
 }
 
+function renderVisaoGeral(visao) {
+  const painel = $("#visao-geral");
+  if (!painel || !visao) return;
+
+  const total = Math.max(0, visao.totalAjustes || 0);
+  const aplicados = Math.max(0, visao.aplicados || 0);
+  const cobertura = Math.min(100, Math.max(0, visao.coberturaPercentual || 0));
+  const percentualInteiro = Math.round(cobertura);
+  const categorias = (visao.categorias || []).slice(0, 6);
+  const perfilNome = visao.perfil === "trabalho" ? "Trabalho" : "Pessoal";
+
+  painel.innerHTML = `
+    <div class="overview-heading">
+      <div>
+        <span class="overview-eyebrow">Vis\u00e3o geral</span>
+        <h2>Progresso do cat\u00e1logo</h2>
+        <p>Acompanhamento do perfil ${esc(perfilNome)} com base no estado atual dos ajustes.</p>
+      </div>
+      <span class="overview-updated">Atualizado agora</span>
+    </div>
+    <div class="overview-layout">
+      <div class="coverage-chart-panel">
+        <div class="coverage-ring" style="--coverage:${percentualInteiro}" role="img" aria-label="${percentualInteiro}% dos ajustes do cat\u00e1logo aplicados">
+          <div class="coverage-ring-center">
+            <strong>${percentualInteiro}%</strong>
+            <span>Cobertura</span>
+          </div>
+        </div>
+        <div class="coverage-copy">
+          <strong>${aplicados} de ${total}</strong>
+          <span>ajustes aplicados</span>
+          <small>Cobertura indica apenas o estado do cat\u00e1logo; n\u00e3o é uma nota de desempenho.</small>
+        </div>
+      </div>
+      <div class="overview-kpis">
+        <div class="overview-stat applied">
+          <span class="overview-stat-label">Aplicados</span>
+          <strong>${aplicados}</strong>
+          <small>prontos no perfil</small>
+        </div>
+        <div class="overview-stat pending">
+          <span class="overview-stat-label">Recomendados</span>
+          <strong>${visao.recomendadosPendentes || 0}</strong>
+          <small>ainda dispon\u00edveis</small>
+        </div>
+        <div class="overview-stat undo">
+          <span class="overview-stat-label">Revers\u00edveis</span>
+          <strong>${visao.pendentesDesfazer || 0}</strong>
+          <small>podem ser desfeitos</small>
+        </div>
+      </div>
+      <div class="category-chart-panel">
+        <div class="category-chart-heading">
+          <strong>Distribui\u00e7\u00e3o por categoria</strong>
+          <span>${categorias.length ? "Principais categorias" : "Sem dados"}</span>
+        </div>
+        <div class="category-bars">
+          ${categorias.map((categoria) => {
+            const categoriaTotal = Math.max(1, categoria.total || 0);
+            const categoriaAplicados = Math.max(0, categoria.aplicados || 0);
+            const categoriaPercentual = Math.min(100, Math.round(categoriaAplicados / categoriaTotal * 100));
+            return `<div class="category-bar-row">
+              <div class="category-bar-label"><span>${esc(categoria.nome)}</span><b>${categoriaAplicados}/${categoria.total}</b></div>
+              <div class="category-bar-track"><span style="width:${categoriaPercentual}%"></span></div>
+            </div>`;
+          }).join("") || '<p class="overview-unavailable">Nenhuma categoria encontrada.</p>'}
+        </div>
+      </div>
+    </div>`;
+}
+
 /* ==========================================================================
    Renderização & Filtros da Lista de Otimizações
    ========================================================================== */
@@ -510,12 +597,14 @@ function atualizarLista() {
 function atualizarContadorSelecionados() {
   const selecionadosCount = $$(".switch-control input:checked").length;
   const badge = $("#selected-badge");
-  const countEl = $("#selected-count");
-  const labelEl = $("#selected-label");
+  const countEl = $("#selecionados-count");
+  const labelEl = $("#selecionados-sub");
   const btnAplicar = $("#btn-aplicar");
 
   if (countEl) countEl.textContent = selecionadosCount;
-  if (labelEl) labelEl.textContent = selecionadosCount === 1 ? "selecionado" : "selecionados";
+  if (labelEl) labelEl.textContent = selecionadosCount
+    ? "Pronto para simular ou aplicar as alterações selecionadas"
+    : "Nenhum item alterado pendente de aplicação";
   if (btnAplicar) btnAplicar.disabled = selecionadosCount === 0;
 
   if (badge) {
@@ -633,7 +722,9 @@ async function aplicar(simular) {
     return;
   }
 
-  const ponto = $("#ponto-restauracao").checked && !$("#wrap-restauracao").hidden;
+  const pontoRestauracao = $("#ponto-restauracao");
+  const areaRestauracao = $("#wrap-restauracao");
+  const ponto = pontoRestauracao?.checked === true && areaRestauracao?.hidden !== true;
   Visualizer.show();
 
   if (ponto) {
@@ -882,7 +973,7 @@ async function aplicarMTU() {
    ========================================================================== */
 
 async function carregarPerfis() {
-  const container = $("#lista-perfis");
+  const container = $("#perfis-lista");
   container.innerHTML = '<p class="muted-text">Carregando perfis de rede…</p>';
   const perfis = await App.ListarPerfisRede();
   container.innerHTML = (perfis || []).map(renderPerfilCard).join("");
@@ -927,11 +1018,11 @@ async function aplicarPerfil(key) {
 let ultimoAntes = null;
 
 async function medirAntes() {
-  const host = $("#destino-latencia").value.trim();
+  const host = $("#destino").value.trim();
   const btn = $("#btn-medir-antes");
   btn.disabled = true;
   btn.innerHTML = `<span class="pulse-spinner"></span> Medindo…`;
-  $("#latencia-resultado").innerHTML = `
+  $("#comparativo-resultado").innerHTML = `
     <div class="glass-card" style="margin-top:14px">
       <div class="health-loading">
         <span class="pulse-spinner"></span>
@@ -943,14 +1034,16 @@ async function medirAntes() {
 
   try {
     ultimoAntes = await App.MedirRedeAntes(host);
+    const valorAntes = $("#lat-antes-val");
+    if (valorAntes) valorAntes.textContent = `${ultimoAntes.avgRTT} ms`;
     Visualizer.log({
       type: "net",
       msg: `Medição base concluída: RTT médio = ${ultimoAntes.avgRTT}ms, Jitter = ${ultimoAntes.stdDev}ms`
     });
-    $("#latencia-resultado").innerHTML = benchmarkHTML(ultimoAntes, "Medição Base — Antes da Otimização");
+    $("#comparativo-resultado").innerHTML = benchmarkHTML(ultimoAntes, "Medição Base — Antes da Otimização");
     if (!ultimoAntes.erro) $("#btn-medir-depois").disabled = false;
   } catch (e) {
-    $("#latencia-resultado").innerHTML = `<div class="glass-card"><h3 class="card-title">Erro na Medição</h3><p class="card-subtitle">${esc(String(e))}</p></div>`;
+    $("#comparativo-resultado").innerHTML = `<div class="glass-card"><h3 class="card-title">Erro na Medição</h3><p class="card-subtitle">${esc(String(e))}</p></div>`;
   } finally {
     btn.disabled = false;
     btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> 1. Medir Antes`;
@@ -958,7 +1051,11 @@ async function medirAntes() {
 }
 
 async function medirDepois() {
-  const host = $("#destino-latencia").value.trim();
+  if (!ultimoAntes) {
+    $("#comparativo-resultado").innerHTML = '<div class="glass-card"><h3 class="card-title">Medição base necessária</h3><p class="card-subtitle">Registre a medição “Antes” antes de comparar a latência atual.</p></div>';
+    return;
+  }
+  const host = $("#destino").value.trim();
   const btn = $("#btn-medir-depois");
   btn.disabled = true;
   btn.innerHTML = `<span class="pulse-spinner"></span> Medindo…`;
@@ -967,22 +1064,24 @@ async function medirDepois() {
   try {
     const depois = await App.MedirRedeDepois(host);
     if (depois.erro) {
-      $("#latencia-resultado").innerHTML = benchmarkHTML(ultimoAntes, "Medição Base — Antes") +
+      $("#comparativo-resultado").innerHTML = benchmarkHTML(ultimoAntes, "Medição Base — Antes") +
         `<div class="glass-card" style="margin-top:14px"><h3 class="card-title">Falha ao Medir Novamente</h3><p class="card-subtitle">${esc(depois.erro)}</p></div>`;
       return;
     }
+    const valorDepois = $("#lat-depois-val");
+    if (valorDepois) valorDepois.textContent = `${depois.avgRTT} ms`;
     const comp = await App.RelatorioComparativo(ultimoAntes, depois);
     Visualizer.log({
       type: "net",
       msg: `Comparação final: Latência ${comp.deltaLatencia}, Jitter ${comp.deltaJitter}`
     });
 
-    $("#latencia-resultado").innerHTML =
+    $("#comparativo-resultado").innerHTML =
       benchmarkHTML(ultimoAntes, "Medição Base — Antes") +
       benchmarkHTML(depois, "Medição — Depois dos Ajustes") +
       comparativoHTML(comp);
   } catch (e) {
-    $("#latencia-resultado").innerHTML += `<div class="glass-card" style="margin-top:14px"><h3 class="card-title">Erro de Comparação</h3><p class="card-subtitle">${esc(String(e))}</p></div>`;
+    $("#comparativo-resultado").innerHTML += `<div class="glass-card" style="margin-top:14px"><h3 class="card-title">Erro de Comparação</h3><p class="card-subtitle">${esc(String(e))}</p></div>`;
   } finally {
     btn.disabled = false;
     btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> 2. Medir Depois`;
@@ -1191,6 +1290,50 @@ async function auditarReparo() {
    DNS Benchmark & DoH
    ========================================================================== */
 
+async function carregarDNSAtual() {
+  const container = $("#dns-atual");
+  if (!container) return;
+  container.innerHTML = '<span class="pulse-spinner"></span><span>Lendo o DNS usado pela conexão ativa…</span>';
+  try {
+    const atual = await App.ObterDNSAtual();
+    if (atual.erro) {
+      container.innerHTML = `<span class="dns-current-label">DNS atual indisponível</span><span class="field-hint">${esc(atual.erro)}</span>`;
+      return;
+    }
+    const servidores = (atual.servidores || []).join(" · ") || "DNS automático (sem servidor informado pelo Windows)";
+    container.innerHTML = `
+      <div>
+        <span class="dns-current-label">DNS em uso</span>
+        <strong>${esc(servidores)}</strong>
+        <span class="field-hint">Interface: ${esc(atual.interface || "rota padrão")}</span>
+      </div>
+      <button class="btn-secondary small-btn" id="btn-atualizar-dns">Atualizar</button>`;
+    $("#btn-atualizar-dns").addEventListener("click", carregarDNSAtual);
+  } catch (e) {
+    container.innerHTML = `<span class="dns-current-label">DNS atual indisponível</span><span class="field-hint">${esc(String(e))}</span>`;
+  }
+}
+
+async function usarDNS(servidores, nome, btn) {
+  if (!servidores || !servidores.length) return;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Aplicando…";
+  }
+  try {
+    const resultado = await App.AplicarDNS(servidores);
+    toast(resultado.mensagem, resultado.ok ? "ok" : "erro");
+    if (resultado.ok) await carregarDNSAtual();
+  } catch (e) {
+    toast(`Não foi possível usar ${nome}: ${String(e)}`, "erro");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Usar este DNS";
+    }
+  }
+}
+
 async function testarDNS() {
   const btn = $("#btn-testar-dns");
   const resEl = $("#dns-resultado");
@@ -1221,6 +1364,7 @@ async function testarDNS() {
               <th>Perda</th>
               <th>Privacidade / Segurança</th>
               <th>DoH (HTTPS)</th>
+              <th>Ação</th>
             </tr>
           </thead>
           <tbody>
@@ -1232,11 +1376,15 @@ async function testarDNS() {
                 <td class="mono">${p.perda.toFixed(0)}%</td>
                 <td>${esc(p.privacidade)}</td>
                 <td class="mono small">${esc(p.dohUrl)}</td>
+                <td><button class="btn-secondary small-btn btn-usar-dns" data-ips="${esc(p.ips.join(','))}" data-nome="${esc(p.nome)}">Usar este DNS</button></td>
               </tr>
             `).join("")}
           </tbody>
         </table>
       </div>`;
+    $$(".btn-usar-dns").forEach((btnUsar) => btnUsar.addEventListener("click", () => {
+      usarDNS((btnUsar.dataset.ips || "").split(",").filter(Boolean), btnUsar.dataset.nome, btnUsar);
+    }));
   } catch (e) {
     resEl.innerHTML = `<div class="empty-results"><p>Erro ao medir DNS: ${esc(String(e))}</p></div>`;
   } finally {
@@ -1394,15 +1542,15 @@ async function verificarPerfil(key) {
 
   try {
     const diag = await App.Diagnosticar("pessoal");
-    const mapaItens = new Map((diag.itens || []).map((it) => [it.meta.id, it]));
+    const mapaItens = new Map((diag.itens || []).map((it) => [it.id, it]));
 
     const linhas = p.tweakIds.map((id) => {
       const it = mapaItens.get(id);
-      const isApplied = it && it.state === "applied";
+      const isApplied = it && it.estado === "aplicado";
       const icon = isApplied ? '<span style="color:var(--accent); font-weight:bold;">[OK]</span>' : '<span style="color:var(--text-muted);">[PENDENTE]</span>';
       return `<div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12px;">
-        <span>${icon} <b>${esc(it ? it.meta.displayName : id)}</b></span>
-        <span class="muted">${esc(it ? it.detail : '')}</span>
+        <span>${icon} <b>${esc(it ? it.nome : id)}</b></span>
+        <span class="muted">${esc(it ? it.detalhe : '')}</span>
       </div>`;
     }).join("");
 

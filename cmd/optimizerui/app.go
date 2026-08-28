@@ -39,6 +39,7 @@ type App struct {
 	benchCancel       context.CancelFunc
 	benchCollector    *telemetry.Collector
 	ultimoReportAntes map[string]telemetry.BenchmarkReport
+	dnsRunner         netdiag.DNSRunner
 }
 
 type medicaoMTU struct {
@@ -71,6 +72,7 @@ func (a *App) startup(ctx context.Context) {
 
 	a.benchCollector = telemetry.NewCollector(telemetry.NewWindowsLiveProvider())
 	a.ultimoReportAntes = make(map[string]telemetry.BenchmarkReport)
+	a.dnsRunner = netdiag.LiveDNSRunner{}
 }
 
 // ---------------------------------------------------------------- tipos da UI
@@ -99,6 +101,26 @@ type DiagnosticoUI struct {
 	RecomendadosPendentes int      `json:"recomendadosPendentes"`
 	PendentesDesfazer     int      `json:"pendentesDesfazer"`
 	CaminhoHistorico      string   `json:"caminhoHistorico"`
+}
+
+// CategoriaVisaoUI agrega os ajustes do catálogo para a visualização de
+// cobertura. Ela não representa uma nota de saúde do Windows: mostra apenas
+// o estado dos ajustes que o Optimizer conhece.
+type CategoriaVisaoUI struct {
+	Nome      string `json:"nome"`
+	Total     int    `json:"total"`
+	Aplicados int    `json:"aplicados"`
+}
+
+// VisaoGeralUI entrega números consolidados para o painel inicial.
+type VisaoGeralUI struct {
+	Perfil                string             `json:"perfil"`
+	TotalAjustes          int                `json:"totalAjustes"`
+	Aplicados             int                `json:"aplicados"`
+	RecomendadosPendentes int                `json:"recomendadosPendentes"`
+	PendentesDesfazer     int                `json:"pendentesDesfazer"`
+	CoberturaPercentual   float64            `json:"coberturaPercentual"`
+	Categorias            []CategoriaVisaoUI `json:"categorias"`
 }
 
 type ResultadoUI struct {
@@ -190,6 +212,51 @@ func (a *App) Diagnosticar(perfil string) DiagnosticoUI {
 	if pend, err := a.eng.PendingIDs(); err == nil {
 		out.PendentesDesfazer = len(pend)
 	}
+	return out
+}
+
+// ResumoVisao consolida o diagnóstico atual em dados prontos para gráficos e
+// indicadores. O percentual é de cobertura do catálogo, não uma promessa de
+// ganho de desempenho ou uma avaliação de saúde do sistema.
+func (a *App) ResumoVisao(perfil string) VisaoGeralUI {
+	diag := a.Diagnosticar(perfil)
+	out := VisaoGeralUI{
+		Perfil:                diag.Perfil,
+		TotalAjustes:          diag.Total,
+		Aplicados:             diag.Aplicados,
+		RecomendadosPendentes: diag.RecomendadosPendentes,
+		PendentesDesfazer:     diag.PendentesDesfazer,
+		Categorias:            make([]CategoriaVisaoUI, 0),
+	}
+	if out.TotalAjustes > 0 {
+		out.CoberturaPercentual = float64(out.Aplicados) / float64(out.TotalAjustes) * 100
+	}
+
+	porCategoria := make(map[string]*CategoriaVisaoUI)
+	for _, item := range diag.Itens {
+		nome := item.Categoria
+		if nome == "" {
+			nome = "Outros"
+		}
+		categoria := porCategoria[nome]
+		if categoria == nil {
+			categoria = &CategoriaVisaoUI{Nome: nome}
+			porCategoria[nome] = categoria
+		}
+		categoria.Total++
+		if item.Estado == "aplicado" {
+			categoria.Aplicados++
+		}
+	}
+	for _, categoria := range porCategoria {
+		out.Categorias = append(out.Categorias, *categoria)
+	}
+	sort.Slice(out.Categorias, func(i, j int) bool {
+		if out.Categorias[i].Total == out.Categorias[j].Total {
+			return out.Categorias[i].Nome < out.Categorias[j].Nome
+		}
+		return out.Categorias[i].Total > out.Categorias[j].Total
+	})
 	return out
 }
 
@@ -490,6 +557,17 @@ type ComparativoUI struct {
 	Interpretacao string      `json:"interpretacao"`
 }
 
+type DNSAtualUI struct {
+	Interface  string   `json:"interface"`
+	Servidores []string `json:"servidores"`
+	Erro       string   `json:"erro,omitempty"`
+}
+
+type ResultadoDNSUI struct {
+	Ok       bool   `json:"ok"`
+	Mensagem string `json:"mensagem"`
+}
+
 // medirRede é a implementação comum de Antes/Depois — só muda o rótulo do momento.
 // Segue o mesmo padrão de MedirMTU: nunca devolve um error Go cru para o
 // frontend (isso vira uma promise rejeitada não tratada no JS); o erro vem
@@ -660,6 +738,43 @@ func (a *App) BenchmarkDNS() []netdiag.DNSProvider {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	return netdiag.BenchmarkDNS(ctx, nil)
+}
+
+// ObterDNSAtual identifica o resolvedor usado pela interface da rota IPv4
+// padrão. A operação é somente leitura.
+func (a *App) ObterDNSAtual() DNSAtualUI {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	atual, err := netdiag.LerDNSAtual(ctx, a.obterDNSRunner())
+	if err != nil {
+		return DNSAtualUI{Erro: err.Error()}
+	}
+	return DNSAtualUI{Interface: atual.InterfaceAlias, Servidores: atual.Servidores}
+}
+
+// AplicarDNS configura os resolvedores escolhidos na interface da rota IPv4
+// padrão. Exige o app elevado porque o Windows protege essa configuração.
+func (a *App) AplicarDNS(servidores []string) ResultadoDNSUI {
+	if a.eng == nil || !a.eng.Elevated {
+		return ResultadoDNSUI{Mensagem: "Alterar o DNS exige permissão de administrador."}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	atual, err := netdiag.LerDNSAtual(ctx, a.obterDNSRunner())
+	if err != nil {
+		return ResultadoDNSUI{Mensagem: err.Error()}
+	}
+	if err := netdiag.ConfigurarDNS(ctx, a.obterDNSRunner(), atual, servidores); err != nil {
+		return ResultadoDNSUI{Mensagem: err.Error()}
+	}
+	return ResultadoDNSUI{Ok: true, Mensagem: "DNS configurado para " + atual.InterfaceAlias + "."}
+}
+
+func (a *App) obterDNSRunner() netdiag.DNSRunner {
+	if a.dnsRunner != nil {
+		return a.dnsRunner
+	}
+	return netdiag.LiveDNSRunner{}
 }
 
 // ResultadoLimpezaPnp resume os nós removidos.
@@ -860,8 +975,8 @@ type BenchmarkProgressUI struct {
 }
 
 type ResultadoAplicacaoPerfil struct {
-	BatchID     string                     `json:"batchId"`
-	Resultados  []ResultadoUI              `json:"resultados"`
+	BatchID     string                    `json:"batchId"`
+	Resultados  []ResultadoUI             `json:"resultados"`
 	ReportAntes telemetry.BenchmarkReport `json:"reportAntes"`
 }
 
@@ -1070,4 +1185,3 @@ func (a *App) IniciarBenchmarkPos(perfilKey string, batchID string, segundos int
 
 	return comp, err
 }
-

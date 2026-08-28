@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"optimizer/internal/engine"
@@ -11,6 +12,21 @@ import (
 	"optimizer/internal/tweaks"
 	"optimizer/internal/winreg"
 )
+
+type fakeAppDNSRunner struct {
+	outputs [][]byte
+	scripts []string
+}
+
+func (f *fakeAppDNSRunner) RunPowerShell(_ context.Context, script string) ([]byte, error) {
+	f.scripts = append(f.scripts, script)
+	if len(f.outputs) == 0 {
+		return nil, nil
+	}
+	out := f.outputs[0]
+	f.outputs = f.outputs[1:]
+	return out, nil
+}
 
 func novoAppTeste(t *testing.T) *App {
 	t.Helper()
@@ -217,3 +233,58 @@ func TestAppBenchmarkFlow(t *testing.T) {
 	app.CancelarBenchmark()
 }
 
+func TestAppResumoVisaoMostraCoberturaECategoriasDoCatalogo(t *testing.T) {
+	app := novoAppTeste(t)
+	antes := app.ResumoVisao("pessoal")
+
+	// Uma aplicação real no registro falso torna a cobertura observável para a UI.
+	res := app.Aplicar([]string{"visual.menu-show-delay"}, false, false)
+	if len(res) != 1 || res[0].Estado != "ok" {
+		t.Fatalf("não foi possível preparar o ajuste aplicado: %+v", res)
+	}
+
+	visao := app.ResumoVisao("pessoal")
+	if visao.TotalAjustes != 41 {
+		t.Errorf("total de ajustes = %d, esperado 41", visao.TotalAjustes)
+	}
+	if visao.Aplicados != antes.Aplicados+1 {
+		t.Errorf("aplicados = %d, esperado %d após aplicar um ajuste", visao.Aplicados, antes.Aplicados+1)
+	}
+	if visao.CoberturaPercentual <= antes.CoberturaPercentual {
+		t.Errorf("cobertura = %.2f%%, esperado valor maior que %.2f%%", visao.CoberturaPercentual, antes.CoberturaPercentual)
+	}
+
+	totalCategorias := 0
+	for _, categoria := range visao.Categorias {
+		totalCategorias += categoria.Total
+	}
+	if totalCategorias != visao.TotalAjustes {
+		t.Errorf("categorias somam %d ajustes, esperado %d", totalCategorias, visao.TotalAjustes)
+	}
+}
+
+func TestAppMostraEAplicaDNSDaInterfaceAtiva(t *testing.T) {
+	app := novoAppTeste(t)
+	app.eng.Elevated = true
+	runner := &fakeAppDNSRunner{outputs: [][]byte{
+		[]byte(`{"interfaceAlias":"Ethernet","interfaceIndex":12,"serverAddresses":["192.168.1.1"]}`),
+		[]byte(`{"interfaceAlias":"Ethernet","interfaceIndex":12,"serverAddresses":["192.168.1.1"]}`),
+	}}
+	app.dnsRunner = runner
+
+	atual := app.ObterDNSAtual()
+	if atual.Erro != "" || atual.Interface != "Ethernet" {
+		t.Fatalf("DNS atual inesperado: %+v", atual)
+	}
+	if len(atual.Servidores) != 1 || atual.Servidores[0] != "192.168.1.1" {
+		t.Fatalf("servidores atuais inesperados: %+v", atual.Servidores)
+	}
+
+	resultado := app.AplicarDNS([]string{"1.1.1.1", "1.0.0.1"})
+	if !resultado.Ok {
+		t.Fatalf("AplicarDNS falhou: %+v", resultado)
+	}
+	if len(runner.scripts) != 3 || !strings.Contains(runner.scripts[2], "Set-DnsClientServerAddress") {
+		t.Fatalf("configuração de DNS não foi executada: %+v", runner.scripts)
+	}
+}

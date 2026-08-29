@@ -197,22 +197,64 @@ const Visualizer = {
 };
 
 /* ==========================================================================
-   Inicialização do App
+   Inicialização do App & Splash Screen
    ========================================================================== */
 
+function atualizarProgressoSplash(atual, total, statusText, detalheText) {
+  const splash = $("#app-splash-screen");
+  if (!splash) return;
+
+  const pct = Math.min(100, Math.max(5, Math.round((atual / total) * 100)));
+  const fill = $("#splash-progress-fill");
+  if (fill) fill.style.width = `${pct}%`;
+
+  const counter = $("#splash-status-counter");
+  if (counter) counter.textContent = `[ ${atual} / ${total} ]`;
+
+  const status = $("#splash-status-text");
+  if (status && statusText) status.textContent = statusText;
+
+  const detail = $("#splash-detail-text");
+  if (detail && detalheText) detail.textContent = detalheText;
+}
+
+function fecharSplash() {
+  const splash = $("#app-splash-screen");
+  if (splash) {
+    splash.classList.add("hidden");
+    setTimeout(() => {
+      splash.style.display = "none";
+    }, 500);
+  }
+}
+
 async function boot() {
+  atualizarProgressoSplash(8, 51, "Conectando ao núcleo do Optimizer…", "Aguardando canal IPC");
   for (let i = 0; i < 60 && !(window.go && window.go.main && window.go.main.App); i++) {
     await sleep(50);
   }
   if (!(window.go && window.go.main && window.go.main.App)) {
-    $("#resumo").innerHTML = '<div class="health-loading">Não foi possível estabelecer comunicação com o motor do Optimizer.</div>';
+    const splash = $("#app-splash-screen");
+    if (splash) {
+      splash.innerHTML = '<div class="splash-card"><p class="danger-text">Não foi possível estabelecer comunicação com o motor do Optimizer.</p></div>';
+    } else {
+      $("#resumo").innerHTML = '<div class="health-loading">Não foi possível estabelecer comunicação com o motor do Optimizer.</div>';
+    }
     return;
   }
   App = window.go.main.App;
   Visualizer.init();
   ligarEventos();
+
+  atualizarProgressoSplash(18, 51, "Carregando perfis e subsistemas…", "Verificando JOGO, NVIDIA e CODING");
   await carregarEstadoPerfis();
-  await diagnosticar();
+
+  atualizarProgressoSplash(32, 51, "Examinando catálogo de 51 otimizações…", "Lendo registro do Windows (HKCU/HKLM)");
+  await diagnosticar(true);
+
+  atualizarProgressoSplash(51, 51, "Inicialização concluída com sucesso!", "Carregando interface principal");
+  await sleep(250);
+  fecharSplash();
 }
 
 /* ==========================================================================
@@ -444,12 +486,18 @@ function ligarEventos() {
    Diagnóstico com Telemetria Visual
    ========================================================================== */
 
-async function diagnosticar() {
+async function diagnosticar(isBoot = false) {
+  const totalEsperado = perfil === "trabalho" ? 37 : 51;
   $("#lista").innerHTML = "";
   $("#resumo").innerHTML = `
-    <div class="health-loading">
-      <span class="pulse-spinner"></span>
-      <span>Examinando chaves de registro do sistema (${esc(perfil)})…</span>
+    <div class="health-loading" style="display:flex; flex-direction:column; gap:10px; width:100%;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:600;"><span class="pulse-spinner"></span> Auditando catálogo de ajustes do sistema (${esc(perfil)})…</span>
+        <span class="mono bold" style="color:var(--accent);" id="resumo-loading-count">[ 0 / ${totalEsperado} ]</span>
+      </div>
+      <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:999px; overflow:hidden;">
+        <div id="resumo-loading-bar" style="width:25%; height:100%; background:linear-gradient(90deg, #00f0ff, #7928ca); border-radius:999px; transition:width 0.2s ease;"></div>
+      </div>
     </div>`;
 
   Visualizer.log({

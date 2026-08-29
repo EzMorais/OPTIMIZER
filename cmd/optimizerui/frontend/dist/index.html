@@ -9,8 +9,35 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="stylesheet" href="app.css">
-</head>
 <body>
+
+<!-- Splash Screen de Abertura com Feedback Passo a Passo -->
+<div id="app-splash-screen" class="splash-overlay">
+  <div class="splash-card">
+    <div class="splash-brand">
+      <div class="splash-logo-glow">
+        <img src="icon.svg" alt="Optimizer Logo" class="splash-logo">
+      </div>
+      <h1 class="splash-title">OPTIMIZER <span class="splash-version">2.0</span></h1>
+      <p class="splash-subtitle">Inicializando motor de diagnóstico e sintonia do sistema…</p>
+    </div>
+
+    <div class="splash-progress-wrap">
+      <div class="splash-progress-bar">
+        <div id="splash-progress-fill" class="splash-progress-fill" style="width: 5%;"></div>
+      </div>
+      <div class="splash-status-row">
+        <span id="splash-status-text" class="splash-status-text">Examinando registros e catálogo de ajustes…</span>
+        <span id="splash-status-counter" class="splash-status-counter mono">[ 0 / 51 ]</span>
+      </div>
+    </div>
+
+    <div class="splash-footer-hint">
+      <span class="radar-dot"></span>
+      <span id="splash-detail-text">Auditoria não destrutiva em tempo real</span>
+    </div>
+  </div>
+</div>
 
 <!-- Header / Barra Superior -->
 <header class="top-header">

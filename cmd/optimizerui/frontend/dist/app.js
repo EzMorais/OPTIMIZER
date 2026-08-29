@@ -229,32 +229,37 @@ function fecharSplash() {
 }
 
 async function boot() {
-  atualizarProgressoSplash(8, 51, "Conectando ao núcleo do Optimizer…", "Aguardando canal IPC");
-  for (let i = 0; i < 60 && !(window.go && window.go.main && window.go.main.App); i++) {
-    await sleep(50);
-  }
-  if (!(window.go && window.go.main && window.go.main.App)) {
-    const splash = $("#app-splash-screen");
-    if (splash) {
-      splash.innerHTML = '<div class="splash-card"><p class="danger-text">Não foi possível estabelecer comunicação com o motor do Optimizer.</p></div>';
-    } else {
-      $("#resumo").innerHTML = '<div class="health-loading">Não foi possível estabelecer comunicação com o motor do Optimizer.</div>';
+  try {
+    atualizarProgressoSplash(8, 51, "Conectando ao núcleo do Optimizer…", "Aguardando canal IPC");
+    for (let i = 0; i < 60 && !(window.go && window.go.main && window.go.main.App); i++) {
+      await sleep(50);
     }
-    return;
+    if (!(window.go && window.go.main && window.go.main.App)) {
+      const splash = $("#app-splash-screen");
+      if (splash) {
+        splash.innerHTML = '<div class="splash-card"><p class="danger-text">Não foi possível estabelecer comunicação com o motor do Optimizer.</p></div>';
+      } else {
+        $("#resumo").innerHTML = '<div class="health-loading">Não foi possível estabelecer comunicação com o motor do Optimizer.</div>';
+      }
+      return;
+    }
+    App = window.go.main.App;
+    Visualizer.init();
+    ligarEventos();
+
+    atualizarProgressoSplash(18, 51, "Carregando perfis e subsistemas…", "Verificando JOGO, NVIDIA e CODING");
+    await carregarEstadoPerfis();
+
+    atualizarProgressoSplash(32, 51, "Examinando catálogo de 51 otimizações…", "Lendo registro do Windows (HKCU/HKLM)");
+    await diagnosticar(true);
+
+    atualizarProgressoSplash(51, 51, "Inicialização concluída com sucesso!", "Carregando interface principal");
+    await sleep(200);
+  } catch (err) {
+    console.error("Erro durante inicialização:", err);
+  } finally {
+    fecharSplash();
   }
-  App = window.go.main.App;
-  Visualizer.init();
-  ligarEventos();
-
-  atualizarProgressoSplash(18, 51, "Carregando perfis e subsistemas…", "Verificando JOGO, NVIDIA e CODING");
-  await carregarEstadoPerfis();
-
-  atualizarProgressoSplash(32, 51, "Examinando catálogo de 51 otimizações…", "Lendo registro do Windows (HKCU/HKLM)");
-  await diagnosticar(true);
-
-  atualizarProgressoSplash(51, 51, "Inicialização concluída com sucesso!", "Carregando interface principal");
-  await sleep(250);
-  fecharSplash();
 }
 
 /* ==========================================================================

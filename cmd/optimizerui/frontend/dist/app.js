@@ -229,35 +229,35 @@ function fecharSplash() {
 }
 
 async function boot() {
+  const fallbackTimeout = setTimeout(() => {
+    fecharSplash();
+  }, 3000);
+
   try {
-    atualizarProgressoSplash(8, 51, "Conectando ao núcleo do Optimizer…", "Aguardando canal IPC");
-    for (let i = 0; i < 60 && !(window.go && window.go.main && window.go.main.App); i++) {
-      await sleep(50);
+    atualizarProgressoSplash(10, 51, "Conectando ao núcleo do Optimizer…", "Aguardando canal IPC");
+    for (let i = 0; i < 30 && !(window.go && window.go.main && window.go.main.App); i++) {
+      await sleep(40);
     }
-    if (!(window.go && window.go.main && window.go.main.App)) {
-      const splash = $("#app-splash-screen");
-      if (splash) {
-        splash.innerHTML = '<div class="splash-card"><p class="danger-text">Não foi possível estabelecer comunicação com o motor do Optimizer.</p></div>';
-      } else {
-        $("#resumo").innerHTML = '<div class="health-loading">Não foi possível estabelecer comunicação com o motor do Optimizer.</div>';
-      }
-      return;
+    if (window.go && window.go.main && window.go.main.App) {
+      App = window.go.main.App;
     }
-    App = window.go.main.App;
     Visualizer.init();
     ligarEventos();
 
-    atualizarProgressoSplash(18, 51, "Carregando perfis e subsistemas…", "Verificando JOGO, NVIDIA e CODING");
-    await carregarEstadoPerfis();
+    atualizarProgressoSplash(25, 51, "Examinando catálogo de 51 otimizações…", "Lendo chaves do Registro (HKCU/HKLM)");
+    if (App && typeof App.Diagnosticar === "function") {
+      await diagnosticar(true);
+    }
 
-    atualizarProgressoSplash(32, 51, "Examinando catálogo de 51 otimizações…", "Lendo registro do Windows (HKCU/HKLM)");
-    await diagnosticar(true);
+    atualizarProgressoSplash(42, 51, "Carregando telemetria e ajustes de rede…", "Sintonia de baixa latência");
+    await sleep(150);
 
     atualizarProgressoSplash(51, 51, "Inicialização concluída com sucesso!", "Carregando interface principal");
     await sleep(200);
   } catch (err) {
     console.error("Erro durante inicialização:", err);
   } finally {
+    clearTimeout(fallbackTimeout);
     fecharSplash();
   }
 }
@@ -354,8 +354,11 @@ function ligarEventos() {
     }
 
     if (viewId === "perfis") {
-      carregarEstadoPerfis();
-      carregarVisaoGeral();
+      try {
+        if (App && typeof App.ResumoVisao === "function") {
+          App.ResumoVisao(perfil).then(renderVisaoGeral).catch(() => {});
+        }
+      } catch (e) {}
     }
     if (viewId === "telemetria") {
       atualizarTelemetriaAoVivo();

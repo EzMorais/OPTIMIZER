@@ -200,6 +200,21 @@ const Visualizer = {
    Inicialização do App & Splash Screen
    ========================================================================== */
 
+function abrirSplash(titulo = "OPTIMIZER", subtitulo = "Inicializando motor de diagnóstico e sintonia do sistema…") {
+  const splash = $("#app-splash-screen");
+  if (!splash) return;
+  splash.style.display = "flex";
+  splash.classList.remove("hidden");
+  
+  const titleEl = splash.querySelector(".splash-title");
+  if (titleEl && titulo) titleEl.innerHTML = `${esc(titulo)} <span class="splash-version">2.0</span>`;
+  
+  const subEl = splash.querySelector(".splash-subtitle");
+  if (subEl && subtitulo) subEl.textContent = subtitulo;
+  
+  atualizarProgressoSplash(0, 51, "Iniciando verificação…", "Preparando ambiente");
+}
+
 function atualizarProgressoSplash(atual, total, statusText, detalheText) {
   const splash = $("#app-splash-screen");
   if (!splash) return;
@@ -224,17 +239,19 @@ function fecharSplash() {
     splash.classList.add("hidden");
     setTimeout(() => {
       splash.style.display = "none";
-    }, 500);
+    }, 450);
   }
 }
 
 async function boot() {
+  abrirSplash();
+
   const fallbackTimeout = setTimeout(() => {
     fecharSplash();
-  }, 3000);
+  }, 4500);
 
   try {
-    atualizarProgressoSplash(10, 51, "Conectando ao núcleo do Optimizer…", "Aguardando canal IPC");
+    atualizarProgressoSplash(6, 51, "Conectando ao núcleo do Optimizer…", "Aguardando canal IPC seguro");
     for (let i = 0; i < 30 && !(window.go && window.go.main && window.go.main.App); i++) {
       await sleep(40);
     }
@@ -244,16 +261,20 @@ async function boot() {
     Visualizer.init();
     ligarEventos();
 
-    atualizarProgressoSplash(25, 51, "Examinando catálogo de 51 otimizações…", "Lendo chaves do Registro (HKCU/HKLM)");
+    atualizarProgressoSplash(16, 51, "Examinando subsistemas de CPU e GPU…", "Prioridade MMCSS e agendamento GPU");
+    await sleep(200);
+
+    atualizarProgressoSplash(32, 51, "Auditando catálogo e integridade do Registro…", "Lendo chaves HKLM/HKCU");
     if (App && typeof App.Diagnosticar === "function") {
       await diagnosticar(true);
     }
-
-    atualizarProgressoSplash(42, 51, "Carregando telemetria e ajustes de rede…", "Sintonia de baixa latência");
-    await sleep(150);
-
-    atualizarProgressoSplash(51, 51, "Inicialização concluída com sucesso!", "Carregando interface principal");
     await sleep(200);
+
+    atualizarProgressoSplash(46, 51, "Carregando telemetria e rede de baixa latência…", "Sintonia de buffers TCP & MTU");
+    await sleep(200);
+
+    atualizarProgressoSplash(51, 51, "Inicialização concluída com sucesso!", "Optimizer 2.0 pronto");
+    await sleep(250);
   } catch (err) {
     console.error("Erro durante inicialização:", err);
   } finally {

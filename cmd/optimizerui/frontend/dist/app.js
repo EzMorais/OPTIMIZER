@@ -28,16 +28,24 @@ const Visualizer = {
   durations: [],
 
   init() {
-    $("#btn-toggle-visualizer").addEventListener("click", () => this.toggle());
-    $("#btn-vis-fechar").addEventListener("click", () => this.hide());
-    $("#btn-vis-limpar").addEventListener("click", () => this.clear());
-    $("#btn-vis-copiar").addEventListener("click", () => this.copy());
+    const btnToggle = $("#btn-toggle-visualizer");
+    if (btnToggle) btnToggle.addEventListener("click", () => this.toggle());
+
+    const btnClose = $("#vis-btn-close") || $("#btn-vis-fechar");
+    if (btnClose) btnClose.addEventListener("click", () => this.hide());
+
+    const btnClear = $("#vis-btn-clear") || $("#btn-vis-limpar");
+    if (btnClear) btnClear.addEventListener("click", () => this.clear());
+
+    const btnCopy = $("#vis-btn-copiar") || $("#btn-vis-copiar");
+    if (btnCopy) btnCopy.addEventListener("click", () => this.copy());
 
     $$(".vis-tab").forEach((btn) => btn.addEventListener("click", () => {
       $$(".vis-tab").forEach((x) => x.classList.toggle("on", x === btn));
       $$(".vis-tab-content").forEach((c) => c.classList.remove("on"));
       const tabId = btn.dataset.vistab;
-      $("#vistab-" + tabId).classList.add("on");
+      const el = $("#vistab-" + tabId);
+      if (el) el.classList.add("on");
     }));
   },
 
@@ -278,6 +286,8 @@ async function boot() {
     await sleep(150);
 
     atualizarProgressoSplash(48, 51, "Carregando telemetria e rede de baixa latência…", "Sintonia de buffers TCP & MTU");
+    await carregarEstadoPerfis();
+    atualizarTelemetriaAoVivo();
     await sleep(150);
 
     atualizarProgressoSplash(51, 51, "Inicialização concluída com sucesso!", "Optimizer 2.0 pronto");
@@ -501,21 +511,17 @@ function ligarEventos() {
     atualizarLista();
   }));
 
-  $("#btn-recomendados").addEventListener("click", marcarRecomendados);
-  $("#btn-simular").addEventListener("click", () => aplicar(true));
-  $("#btn-aplicar").addEventListener("click", () => aplicar(false));
-  $("#btn-desfazer-tudo").addEventListener("click", desfazerTudo);
+  const btnSimular = $("#btn-simular");
+  if (btnSimular) btnSimular.addEventListener("click", () => aplicar(true));
 
-  $("#btn-medir").addEventListener("click", medirMTU);
-  $("#btn-medir-antes").addEventListener("click", medirAntes);
-  $("#btn-medir-depois").addEventListener("click", medirDepois);
+  const btnAplicar = $("#btn-aplicar");
+  if (btnAplicar) btnAplicar.addEventListener("click", () => aplicar(false));
 
-  $("#btn-abrir-hist").addEventListener("click", async () => {
-    const erro = await App.AbrirHistorico();
-    if (erro) abrirModal("Histórico", `<p>O arquivo está localizado em:</p><div class="terminal-block"><div>${esc(erro)}</div></div>`);
-  });
-  $("#modal-fechar").addEventListener("click", fecharModal);
-  $("#btn-modal-x").addEventListener("click", fecharModal);
+  const modalFechar = $("#modal-fechar");
+  if (modalFechar) modalFechar.addEventListener("click", fecharModal);
+
+  const btnModalX = $("#btn-modal-x");
+  if (btnModalX) btnModalX.addEventListener("click", fecharModal);
 }
 
 /* ==========================================================================

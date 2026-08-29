@@ -304,3 +304,86 @@ test("executa o benchmark GRC DNS com barras visuais de velocidade", async () =>
   assert.equal(elementos["#btn-testar-dns"].disabled, false);
 });
 
+test("escaneia e limpa dispositivos fantasmas", async () => {
+  const elementos = {
+    "#pnp-resultado": { innerHTML: "" },
+    "#btn-escanear-pnp": { disabled: false, innerHTML: "" },
+    "#btn-limpar-pnp": { disabled: false, style: { display: "none" }, innerHTML: "" },
+  };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`
+    App = {
+      ListarDispositivosFantasmas: async () => [
+        { InstanceId: "USB\\VID_0000", FriendlyName: "Antigo Mouse USB Desconectado", Class: "Mouse" }
+      ],
+      LimparDispositivosFantasmas: async () => ({
+        removidos: 1, erros: [], mensagem: "1 dispositivo(s) fantasma(s) removido(s) com sucesso."
+      })
+    };
+    Visualizer.show = () => {};
+    Visualizer.log = () => {};
+    toast = () => {};
+  `, ui);
+
+  await ui.escanearDispositivosFantasmas();
+  assert.match(elementos["#pnp-resultado"].innerHTML, /Antigo Mouse USB/);
+  assert.equal(elementos["#btn-limpar-pnp"].style.display, "inline-flex");
+
+  await ui.limparDispositivosFantasmas();
+  assert.equal(elementos["#btn-limpar-pnp"].disabled, false);
+});
+
+test("executa auditoria de integridade do sistema DISM e SFC", async () => {
+  const elementos = {
+    "#reparo-resultado": { innerHTML: "" },
+    "#btn-auditar-reparo": { disabled: false, innerHTML: "" },
+  };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`
+    App = {
+      AuditarReparo: async () => ({
+        dismHealthy: true,
+        sfcHealthy: true,
+        interpretation: "Nenhuma violação de integridade ou corrupção encontrada nos arquivos de sistema.",
+        dismOutput: "No component store corruption detected.",
+        sfcOutput: "Windows Resource Protection did not find any integrity violations."
+      })
+    };
+    Visualizer.show = () => {};
+    Visualizer.log = () => {};
+  `, ui);
+
+  await ui.auditarReparo();
+  assert.match(elementos["#reparo-resultado"].innerHTML, /Sistema Saudável/);
+  assert.match(elementos["#reparo-resultado"].innerHTML, /DISM CheckHealth/);
+  assert.equal(elementos["#btn-auditar-reparo"].disabled, false);
+});
+
+test("mede e sintoniza MTU sem fragmentacao de pacotes", async () => {
+  const elementos = {
+    "#mtu-resultado": { innerHTML: "" },
+    "#btn-medir-mtu": { disabled: false },
+    "#destino": { value: "8.8.8.8" },
+  };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`
+    App = {
+      MedirMTU: async () => ({
+        mtuAtual: 1500,
+        mtuOtimo: 1500,
+        interface: "Ethernet",
+        precisaFix: false,
+        mensagem: "Pacotes de 1500 bytes transitam sem fragmentação."
+      })
+    };
+    Visualizer.show = () => {};
+    Visualizer.log = () => {};
+  `, ui);
+
+  await ui.medirMTU();
+  assert.match(elementos["#mtu-resultado"].innerHTML, /1500 bytes/);
+  assert.match(elementos["#mtu-resultado"].innerHTML, /Sem Fragmentação/);
+  assert.equal(elementos["#btn-medir-mtu"].disabled, false);
+});
+
+

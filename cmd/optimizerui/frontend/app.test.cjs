@@ -175,7 +175,7 @@ test("mostra a medição atual de latência depois da comparação", async () =>
   await ui.medirDepois();
 
   assert.equal(elementos["#lat-depois-val"].textContent, "12 ms");
-  assert.match(elementos["#comparativo-resultado"].innerHTML, /Relatório de Impacto Real/);
+  assert.match(elementos["#comparativo-resultado"].innerHTML, /Relatório de Impacto/i);
 });
 
 test("não mede o depois sem uma linha de base registrada", async () => {

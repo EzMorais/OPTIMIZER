@@ -359,3 +359,23 @@ func TestAppMatrizPingJogos(t *testing.T) {
 		t.Errorf("MatrizPingJogos retornou 0 regiões: %+v", res)
 	}
 }
+
+func TestAppMedirRedeComPacotes(t *testing.T) {
+	app := novoAppTeste(t)
+	res := app.MedirRedeComPacotes("8.8.8.8", 3)
+	if res.Host != "8.8.8.8" {
+		t.Errorf("Host incorreto: %s", res.Host)
+	}
+}
+
+func TestAppMTU(t *testing.T) {
+	app := novoAppTeste(t)
+	res := app.MedirMTU("8.8.8.8")
+	if res.Erro != "" && res.MTUAtual == 0 {
+		// Normal em ambiente restrito ou sem IPv4 ativo
+		return
+	}
+	if res.MTUAtual > 0 && res.MTUAtual < 576 {
+		t.Errorf("MTU inválido: %d", res.MTUAtual)
+	}
+}

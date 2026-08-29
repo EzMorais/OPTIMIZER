@@ -42,16 +42,18 @@ const Visualizer = {
   },
 
   show() {
-    $("#visualizer-drawer").hidden = false;
+    const el = $("#visualizer-drawer");
+    if (el) el.hidden = false;
   },
 
   hide() {
-    $("#visualizer-drawer").hidden = true;
+    const el = $("#visualizer-drawer");
+    if (el) el.hidden = true;
   },
 
   toggle() {
     const el = $("#visualizer-drawer");
-    el.hidden = !el.hidden;
+    if (el) el.hidden = !el.hidden;
   },
 
   clear() {
@@ -362,6 +364,15 @@ function ligarEventos() {
 
   const btnFlushRede = $("#btn-flush-rede");
   if (btnFlushRede) btnFlushRede.addEventListener("click", executarFlushRede);
+
+  const btnMedirAntes = $("#btn-medir-antes");
+  if (btnMedirAntes) btnMedirAntes.addEventListener("click", medirAntes);
+
+  const btnMedirDepois = $("#btn-medir-depois");
+  if (btnMedirDepois) btnMedirDepois.addEventListener("click", medirDepois);
+
+  const btnMedirMTU = $("#btn-medir-mtu");
+  if (btnMedirMTU) btnMedirMTU.addEventListener("click", medirMTU);
 
   const btnEscanearPnp = $("#btn-escanear-pnp");
   if (btnEscanearPnp) btnEscanearPnp.addEventListener("click", escanearDispositivosFantasmas);
@@ -1039,41 +1050,117 @@ async function aplicarPerfil(key) {
 }
 
 /* ==========================================================================
-   Latência & Benchmark
+   Sintonia de MTU
+   ========================================================================== */
+
+async function medirMTU() {
+  const btn = $("#btn-medir-mtu");
+  const container = $("#mtu-resultado");
+  if (btn) btn.disabled = true;
+  if (container) {
+    container.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Identificando tamanho máximo de pacote (MTU) sem fragmentação…</span></div>';
+  }
+
+  Visualizer.show();
+  Visualizer.log({ type: "net", msg: "Iniciando detecção de MTU ótimo por sondagem binária ICMP com DF..." });
+
+  try {
+    const host = ($("#destino")?.value || "8.8.8.8").trim();
+    const res = await App.MedirMTU(host);
+    if (res.erro) {
+      if (container) container.innerHTML = `<p class="danger-text">Erro ao medir MTU: ${esc(res.erro)}</p>`;
+      return;
+    }
+
+    if (container) {
+      container.innerHTML = `
+        <div style="background:var(--bg-sunken); padding:14px; border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-size:0.9rem; color:var(--text-secondary);">Interface Ativa: <b>${esc(res.interface || 'Ethernet')}</b></div>
+              <div style="margin-top:4px;">MTU Atual: <b class="mono" style="font-size:1.1rem;">${res.mtuAtual || 1500} bytes</b> · MTU Ótimo Recomendado: <b class="mono" style="color:var(--accent); font-size:1.2rem;">${res.mtuOtimo || 1500} bytes</b></div>
+            </div>
+            ${res.precisaFix ? `
+              <button class="btn-primary small-btn" id="btn-aplicar-mtu-fix">Corrigir MTU</button>
+            ` : `
+              <span class="badge-tag rec" style="background:rgba(16,185,129,0.15); color:#10b981; padding:4px 8px; font-weight:700;">[MTU Ótimo / Sem Fragmentação]</span>
+            `}
+          </div>
+          <p class="field-hint" style="margin-top:8px;">${esc(res.mensagem || 'Pacotes transitam sem fragmentação na rota.')}</p>
+        </div>
+      `;
+
+      const btnFix = $("#btn-aplicar-mtu-fix");
+      if (btnFix) {
+        btnFix.addEventListener("click", async () => {
+          btnFix.disabled = true;
+          toast(`Ajustando MTU para ${res.mtuOtimo} bytes…`, "info");
+          const r = await App.AplicarMTU(res.mtuOtimo);
+          toast(r.mensagem, r.ok ? "ok" : "err");
+          await medirMTU();
+        });
+      }
+    }
+  } catch (e) {
+    if (container) container.innerHTML = `<p class="danger-text">Erro: ${esc(String(e))}</p>`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/* ==========================================================================
+   Latência & Benchmark Antes / Depois
    ========================================================================== */
 
 let ultimoAntes = null;
 
 async function medirAntes() {
-  const host = $("#destino").value.trim();
+  const host = ($("#destino")?.value || "8.8.8.8").trim();
+  const pacotesInput = $("#pacotes");
+  const pacotes = pacotesInput ? parseInt(pacotesInput.value, 10) || 10 : 10;
   const btn = $("#btn-medir-antes");
-  btn.disabled = true;
-  btn.innerHTML = `<span class="pulse-spinner"></span> Medindo…`;
+  if (btn) btn.disabled = true;
+  if (btn) btn.innerHTML = `<span class="pulse-spinner"></span> Medindo (${pacotes} pkts)…`;
+  
   $("#comparativo-resultado").innerHTML = `
     <div class="glass-card" style="margin-top:14px">
       <div class="health-loading">
         <span class="pulse-spinner"></span>
-        <span>Enviando 20 pacotes de teste para medir latência base…</span>
+        <span>Enviando ${pacotes} pacotes de teste para [${esc(host)}] para registrar a medição base…</span>
       </div>
     </div>`;
 
-  Visualizer.log({ type: "net", msg: `Disparando 20 sondagens ICMP de medição base até [${host}]...` });
+  Visualizer.show();
+  Visualizer.log({ type: "net", msg: `Disparando ${pacotes} sondagens ICMP de medição base até [${host}]...` });
 
   try {
-    ultimoAntes = await App.MedirRedeAntes(host);
+    ultimoAntes = typeof App.MedirRedeComPacotes === "function" 
+      ? await App.MedirRedeComPacotes(host, pacotes) 
+      : await App.MedirRedeAntes(host);
+
     const valorAntes = $("#lat-antes-val");
     if (valorAntes) valorAntes.textContent = `${ultimoAntes.avgRTT} ms`;
+
     Visualizer.log({
       type: "net",
       msg: `Medição base concluída: RTT médio = ${ultimoAntes.avgRTT}ms, Jitter = ${ultimoAntes.stdDev}ms`
     });
+
     $("#comparativo-resultado").innerHTML = benchmarkHTML(ultimoAntes, "Medição Base — Antes da Otimização");
-    if (!ultimoAntes.erro) $("#btn-medir-depois").disabled = false;
+    
+    const btnDepois = $("#btn-medir-depois");
+    if (btnDepois && !ultimoAntes.erro) {
+      btnDepois.disabled = false;
+      if (btnDepois.classList) btnDepois.classList.remove("disabled");
+    }
+    toast("Medição base concluída! Agora você pode realizar a medição pós-otimização.", "ok");
   } catch (e) {
     $("#comparativo-resultado").innerHTML = `<div class="glass-card"><h3 class="card-title">Erro na Medição</h3><p class="card-subtitle">${esc(String(e))}</p></div>`;
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> 1. Medir Antes`;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;"><polygon points="5 3 19 12 5 21 5 3"/></svg> 1. Medir Antes`;
+    }
   }
 }
 
@@ -1082,14 +1169,21 @@ async function medirDepois() {
     $("#comparativo-resultado").innerHTML = '<div class="glass-card"><h3 class="card-title">Medição base necessária</h3><p class="card-subtitle">Registre a medição “Antes” antes de comparar a latência atual.</p></div>';
     return;
   }
-  const host = $("#destino").value.trim();
+  const host = ($("#destino")?.value || "8.8.8.8").trim();
+  const pacotesInput = $("#pacotes");
+  const pacotes = pacotesInput ? parseInt(pacotesInput.value, 10) || 10 : 10;
   const btn = $("#btn-medir-depois");
-  btn.disabled = true;
-  btn.innerHTML = `<span class="pulse-spinner"></span> Medindo…`;
-  Visualizer.log({ type: "net", msg: `Disparando 20 sondagens ICMP de pós-otimização até [${host}]...` });
+  if (btn) btn.disabled = true;
+  if (btn) btn.innerHTML = `<span class="pulse-spinner"></span> Medindo (${pacotes} pkts)…`;
+  
+  Visualizer.show();
+  Visualizer.log({ type: "net", msg: `Disparando ${pacotes} sondagens ICMP de pós-otimização até [${host}]...` });
 
   try {
-    const depois = await App.MedirRedeDepois(host);
+    const depois = typeof App.MedirRedeComPacotes === "function"
+      ? await App.MedirRedeComPacotes(host, pacotes)
+      : await App.MedirRedeDepois(host);
+
     if (depois.erro) {
       $("#comparativo-resultado").innerHTML = benchmarkHTML(ultimoAntes, "Medição Base — Antes") +
         `<div class="glass-card" style="margin-top:14px"><h3 class="card-title">Falha ao Medir Novamente</h3><p class="card-subtitle">${esc(depois.erro)}</p></div>`;
@@ -1097,6 +1191,7 @@ async function medirDepois() {
     }
     const valorDepois = $("#lat-depois-val");
     if (valorDepois) valorDepois.textContent = `${depois.avgRTT} ms`;
+
     const comp = await App.RelatorioComparativo(ultimoAntes, depois);
     Visualizer.log({
       type: "net",
@@ -1104,30 +1199,40 @@ async function medirDepois() {
     });
 
     $("#comparativo-resultado").innerHTML =
-      benchmarkHTML(ultimoAntes, "Medição Base — Antes") +
-      benchmarkHTML(depois, "Medição — Depois dos Ajustes") +
+      benchmarkHTML(ultimoAntes, "Medição Base — Antes da Otimização") +
+      benchmarkHTML(depois, "Medição Atual — Depois das Otimizações") +
       comparativoHTML(comp);
   } catch (e) {
     $("#comparativo-resultado").innerHTML += `<div class="glass-card" style="margin-top:14px"><h3 class="card-title">Erro de Comparação</h3><p class="card-subtitle">${esc(String(e))}</p></div>`;
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> 2. Medir Depois`;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px;"><polygon points="5 3 19 12 5 21 5 3"/></svg> 2. Medir Depois`;
+    }
   }
 }
 
 function benchmarkHTML(b, titulo) {
   if (b.erro) return `<div class="glass-card" style="margin-top:14px"><h3 class="card-title">Falha</h3><p class="card-subtitle">${esc(b.erro)}</p></div>`;
+  let badgeColor = "#10b981";
+  if (b.avgRTT > 40) badgeColor = "#3b82f6";
+  if (b.avgRTT > 90) badgeColor = "#f59e0b";
+  if (b.avgRTT > 150) badgeColor = "#ef4444";
+
   return `
   <div class="glass-card" style="margin-top:14px">
-    <h3 class="card-title">${esc(titulo)}</h3>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3 class="card-title">${esc(titulo)}</h3>
+      <span class="mono bold" style="color:${badgeColor}; font-size:1.3rem;">${b.avgRTT} ms</span>
+    </div>
     <p class="field-hint">Destino ${esc(b.host)} · ${b.packetsSent} pacotes enviados · ${b.packetsLost} pacote(s) perdido(s)</p>
-    <div class="data-table-wrap">
+    <div class="data-table-wrap" style="margin-top:10px;">
       <table class="data-table">
         <thead><tr><th>Métrica</th><th>Valor Obtido</th></tr></thead>
         <tbody>
           <tr><td>Latência Média (RTT)</td><td class="mono"><b>${b.avgRTT} ms</b></td></tr>
           <tr><td>Variação Mínima / Máxima</td><td class="mono">${b.minRTT} ms / ${b.maxRTT} ms</td></tr>
-          <tr><td>Jitter (Desvio Padrão)</td><td class="mono">${b.stdDev} ms</td></tr>
+          <tr><td>Jitter (Estabilidade)</td><td class="mono">±${b.stdDev} ms</td></tr>
           <tr><td>Perda de Pacotes</td><td class="mono">${(b.lossPercent ?? 0).toFixed(1)}%</td></tr>
         </tbody>
       </table>
@@ -1137,10 +1242,13 @@ function benchmarkHTML(b, titulo) {
 
 function comparativoHTML(c) {
   return `
-  <div class="glass-card" style="margin-top:14px; border-left: 3px solid var(--accent)">
-    <h3 class="card-title">Relatório de Impacto Real</h3>
-    <p class="card-subtitle">${esc(c.interpretacao)}</p>
-    <p class="field-hint" style="margin-top:6px">Variação de Latência: <b>${esc(c.deltaLatencia)}</b> · Jitter: <b>${esc(c.deltaJitter)}</b></p>
+  <div class="glass-card" style="margin-top:14px; border-left: 4px solid var(--accent); background:rgba(0, 240, 255, 0.05);">
+    <h3 class="card-title" style="color:var(--accent);">Relatório de Impacto em Tempo Real</h3>
+    <p class="card-subtitle" style="font-size:1.05rem; margin-top:4px;">${esc(c.interpretacao)}</p>
+    <div style="display:flex; gap:20px; margin-top:12px; font-size:0.95rem;">
+      <div>Variação de Latência: <b class="mono" style="color:var(--accent);">${esc(c.deltaLatencia)}</b></div>
+      <div>Jitter: <b class="mono">${esc(c.deltaJitter)}</b></div>
+    </div>
   </div>`;
 }
 

@@ -569,15 +569,32 @@ type ResultadoDNSUI struct {
 	Mensagem string `json:"mensagem"`
 }
 
-// medirRede é a implementação comum de Antes/Depois — só muda o rótulo do momento.
-// Segue o mesmo padrão de MedirMTU: nunca devolve um error Go cru para o
-// frontend (isso vira uma promise rejeitada não tratada no JS); o erro vem
-// embutido no campo Erro da própria struct.
-func (a *App) medirRede(host string) BenchmarkUI {
+// ResultadoMTUUI encapsula a medição e diagnóstico do tamanho máximo de transmissão.
+type ResultadoMTUUI struct {
+	MTUAtual   int    `json:"mtuAtual"`
+	MTUOtimo   int    `json:"mtuOtimo"`
+	Interface  string `json:"interface"`
+	Mensagem   string `json:"mensagem"`
+	PrecisaFix bool   `json:"precisaFix"`
+	Erro       string `json:"erro,omitempty"`
+}
+
+// MedirRedeComPacotes executa sondagens ICMP rápidas com quantidade customizada de pacotes.
+func (a *App) MedirRedeComPacotes(host string, pacotes int) BenchmarkUI {
 	if host == "" {
 		host = "8.8.8.8"
 	}
-	report, err := netdiag.MeasureLatency(a.ctx, host, 20)
+	if pacotes <= 0 {
+		pacotes = 10
+	}
+	if pacotes > 30 {
+		pacotes = 30
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	report, err := netdiag.MeasureLatency(ctx, host, pacotes)
 	if err != nil {
 		return BenchmarkUI{Host: host, Erro: err.Error()}
 	}
@@ -598,14 +615,14 @@ func (a *App) medirRede(host string) BenchmarkUI {
 	}
 }
 
-// MedirRedeAntes executa um benchmark antes de aplicar um ajuste.
+// MedirRedeAntes executa um benchmark base de latência antes dos ajustes.
 func (a *App) MedirRedeAntes(host string) BenchmarkUI {
-	return a.medirRede(host)
+	return a.MedirRedeComPacotes(host, 10)
 }
 
-// MedirRedeDepois executa um benchmark depois de aplicar um ajuste.
+// MedirRedeDepois executa um benchmark de comparação após os ajustes.
 func (a *App) MedirRedeDepois(host string) BenchmarkUI {
-	return a.medirRede(host)
+	return a.MedirRedeComPacotes(host, 10)
 }
 
 // RelatorioComparativo compara dois benchmarks e retorna a interpretação honesta.

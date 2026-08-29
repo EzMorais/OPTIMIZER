@@ -1218,6 +1218,7 @@ async function testarDNS() {
 
                 const rttStr = p.avgRttMs < 999 ? `${p.avgRttMs} ms` : "Falhou";
                 const ipsJson = JSON.stringify(p.ips || []).replace(/"/g, "&quot;");
+                const speedPercent = p.avgRttMs < 999 ? Math.max(8, Math.min(100, Math.round(100 - (p.avgRttMs * 0.45)))) : 0;
 
                 return `
                   <tr>
@@ -1226,7 +1227,14 @@ async function testarDNS() {
                       <div class="field-hint" style="font-family:var(--font-mono); font-size:11px;">${esc((p.ips || []).join(", "))}</div>
                     </td>
                     <td><span class="badge-tag rec">${esc(p.privacidade || 'Padrão')}</span></td>
-                    <td class="mono bold" style="color:${badgeColor}; font-size:1.1rem;">${rttStr}</td>
+                    <td>
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="flex:1; height:6px; background:rgba(255,255,255,0.08); border-radius:999px; overflow:hidden; min-width:80px;">
+                          <div style="width:${speedPercent}%; height:100%; background:${badgeColor}; border-radius:999px; transition:width 0.4s ease;"></div>
+                        </div>
+                        <span class="mono bold" style="color:${badgeColor}; font-size:1rem; min-width:60px; text-align:right;">${rttStr}</span>
+                      </div>
+                    </td>
                     <td>
                       <button class="btn-primary small-btn btn-usar-dns" data-ips="${ipsJson}" data-nome="${esc(p.nome)}">
                         Usar este DNS
@@ -1306,6 +1314,7 @@ async function testarMatrizJogos() {
 
         const pingStr = r.pingMs > 0 ? `${r.pingMs} ms` : "—";
         const jitterStr = r.jitterMs > 0 ? `±${r.jitterMs.toFixed(1)}ms` : "";
+        const signalPercent = r.pingMs > 0 ? Math.max(5, Math.min(100, Math.round(100 - (r.pingMs * 0.5)))) : 0;
 
         return `
           <div class="game-node-card" style="background:var(--bg-sunken); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-subtle); display:flex; flex-direction:column; gap:6px;">
@@ -1314,6 +1323,9 @@ async function testarMatrizJogos() {
               <span class="mono bold" style="color:${badgeColor}; font-size:0.75rem; background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px;">${statusLabel}</span>
             </div>
             <div style="font-size:0.72rem; color:var(--text-muted);">${esc(r.localizacao)} (${esc(r.host)})</div>
+            <div style="height:4px; background:rgba(255,255,255,0.08); border-radius:999px; overflow:hidden; margin-top:4px;">
+              <div style="width:${signalPercent}%; height:100%; background:${badgeColor}; border-radius:999px; transition:width 0.4s ease;"></div>
+            </div>
             <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:4px;">
               <span class="mono bold" style="font-size:1.3rem; color:${badgeColor};">${pingStr}</span>
               <span class="mono" style="font-size:0.75rem; color:var(--text-secondary);">${jitterStr}</span>

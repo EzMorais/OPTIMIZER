@@ -228,3 +228,79 @@ test("aplica rapidamente os IPs do DNS escolhido no benchmark", async () => {
   assert.equal(botao.textContent, "Usar este DNS");
   assert.equal(botao.disabled, false);
 });
+
+test("testa e renderiza a matriz de latencia de servidores de jogos", async () => {
+  const elementos = {
+    "#matriz-jogos-container": { innerHTML: "" },
+    "#btn-testar-matriz-jogos": { disabled: false },
+  };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`
+    App = {
+      MatrizPingJogos: async () => [
+        { codigo: "br-sp", nome: "Brasil (São Paulo)", host: "189.38.95.95", localizacao: "BR", bandeira: "🇧🇷", pingMs: 14, jitterMs: 1.2, status: "otimo" },
+        { codigo: "us-east", nome: "EUA Leste", host: "8.8.8.8", localizacao: "US", bandeira: "🇺🇸", pingMs: 118, jitterMs: 2.5, status: "regular" }
+      ]
+    };
+  `, ui);
+
+  await ui.testarMatrizJogos();
+
+  assert.match(elementos["#matriz-jogos-container"].innerHTML, /Brasil \(São Paulo\)/);
+  assert.match(elementos["#matriz-jogos-container"].innerHTML, /14 ms/);
+  assert.match(elementos["#matriz-jogos-container"].innerHTML, /EUA Leste/);
+  assert.equal(elementos["#btn-testar-matriz-jogos"].disabled, false);
+});
+
+test("executa limpeza profunda e flush da pilha de rede", async () => {
+  const elementos = {
+    "#flush-resultado": { innerHTML: "" },
+    "#btn-flush-rede": { disabled: false },
+  };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`
+    App = {
+      FlushingRede: async () => ({
+        ok: true,
+        mensagem: "4 operações de rede executadas com sucesso.",
+        etapas: ["Limpeza de Cache DNS: Concluído", "Reset Winsock: Concluído"],
+        erros: []
+      })
+    };
+    Visualizer.log = () => {};
+    toast = () => {};
+  `, ui);
+
+  await ui.executarFlushRede();
+
+  assert.match(elementos["#flush-resultado"].innerHTML, /4 operações de rede/);
+  assert.match(elementos["#flush-resultado"].innerHTML, /Limpeza de Cache DNS/);
+  assert.equal(elementos["#btn-flush-rede"].disabled, false);
+});
+
+test("executa o benchmark GRC DNS com barras visuais de velocidade", async () => {
+  const elementos = {
+    "#dns-resultado": { innerHTML: "" },
+    "#btn-testar-dns": { disabled: false },
+  };
+  const ui = carregarControlador(elementos, { ".btn-usar-dns": [] });
+  vm.runInContext(`
+    App = {
+      BenchmarkDNS: async () => [
+        { nome: "Cloudflare (1.1.1.1)", ips: ["1.1.1.1", "1.0.0.1"], avgRttMs: 11, privacidade: "Sem Logs", perda: 0, recomendado: true },
+        { nome: "Google Public DNS", ips: ["8.8.8.8", "8.8.4.4"], avgRttMs: 15, privacidade: "Global", perda: 0, recomendado: false }
+      ]
+    };
+    Visualizer.show = () => {};
+    Visualizer.log = () => {};
+    toast = () => {};
+  `, ui);
+
+  await ui.testarDNS();
+
+  assert.match(elementos["#dns-resultado"].innerHTML, /Cloudflare/);
+  assert.match(elementos["#dns-resultado"].innerHTML, /11 ms/);
+  assert.match(elementos["#dns-resultado"].innerHTML, /Google Public DNS/);
+  assert.equal(elementos["#btn-testar-dns"].disabled, false);
+});
+

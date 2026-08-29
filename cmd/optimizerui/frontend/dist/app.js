@@ -243,38 +243,45 @@ function fecharSplash() {
   }
 }
 
+async function aguardarApp() {
+  for (let i = 0; i < 80; i++) {
+    if (window.go && window.go.main && window.go.main.App) {
+      App = window.go.main.App;
+      return App;
+    }
+    await sleep(40);
+  }
+  return null;
+}
+
 async function boot() {
   abrirSplash();
 
   const fallbackTimeout = setTimeout(() => {
     fecharSplash();
-  }, 4500);
+  }, 4000);
 
   try {
-    atualizarProgressoSplash(6, 51, "Conectando ao núcleo do Optimizer…", "Aguardando canal IPC seguro");
-    for (let i = 0; i < 30 && !(window.go && window.go.main && window.go.main.App); i++) {
-      await sleep(40);
-    }
-    if (window.go && window.go.main && window.go.main.App) {
-      App = window.go.main.App;
-    }
+    atualizarProgressoSplash(8, 51, "Conectando ao núcleo do Optimizer…", "Aguardando canal IPC seguro");
+    await aguardarApp();
+
     Visualizer.init();
     ligarEventos();
 
-    atualizarProgressoSplash(16, 51, "Examinando subsistemas de CPU e GPU…", "Prioridade MMCSS e agendamento GPU");
-    await sleep(200);
+    atualizarProgressoSplash(18, 51, "Examinando subsistemas de CPU e GPU…", "Prioridade MMCSS e agendamento GPU");
+    await sleep(150);
 
-    atualizarProgressoSplash(32, 51, "Auditando catálogo e integridade do Registro…", "Lendo chaves HKLM/HKCU");
+    atualizarProgressoSplash(35, 51, "Auditando catálogo e integridade do Registro…", "Lendo chaves HKLM/HKCU");
     if (App && typeof App.Diagnosticar === "function") {
       await diagnosticar(true);
     }
-    await sleep(200);
+    await sleep(150);
 
-    atualizarProgressoSplash(46, 51, "Carregando telemetria e rede de baixa latência…", "Sintonia de buffers TCP & MTU");
-    await sleep(200);
+    atualizarProgressoSplash(48, 51, "Carregando telemetria e rede de baixa latência…", "Sintonia de buffers TCP & MTU");
+    await sleep(150);
 
     atualizarProgressoSplash(51, 51, "Inicialização concluída com sucesso!", "Optimizer 2.0 pronto");
-    await sleep(250);
+    await sleep(200);
   } catch (err) {
     console.error("Erro durante inicialização:", err);
   } finally {
@@ -515,19 +522,52 @@ function ligarEventos() {
    Diagnóstico com Telemetria Visual
    ========================================================================== */
 
+function gerarVisaoGeralDeDiagnostico(d) {
+  if (!d) return null;
+  const total = d.total || (d.itens ? d.itens.length : 0);
+  const aplicados = d.aplicados || 0;
+  const cobertura = total > 0 ? (aplicados / total) * 100 : 0;
+  
+  const catMap = {};
+  (d.itens || []).forEach((it) => {
+    const nome = it.categoria || "Outros";
+    if (!catMap[nome]) catMap[nome] = { nome, total: 0, aplicados: 0 };
+    catMap[nome].total++;
+    if (it.estado === "aplicado") catMap[nome].aplicados++;
+  });
+  
+  return {
+    perfil: d.perfil || perfil,
+    totalAjustes: total,
+    aplicados: aplicados,
+    recomendadosPendentes: d.recomendadosPendentes || 0,
+    pendentesDesfazer: d.pendentesDesfazer || 0,
+    coberturaPercentual: cobertura,
+    categorias: Object.values(catMap)
+  };
+}
+
 async function diagnosticar(isBoot = false) {
+  if (!App) await aguardarApp();
+  if (!App || typeof App.Diagnosticar !== "function") return;
+
   const totalEsperado = perfil === "trabalho" ? 37 : 51;
-  $("#lista").innerHTML = "";
-  $("#resumo").innerHTML = `
-    <div class="health-loading" style="display:flex; flex-direction:column; gap:10px; width:100%;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:600;"><span class="pulse-spinner"></span> Auditando catálogo de ajustes do sistema (${esc(perfil)})…</span>
-        <span class="mono bold" style="color:var(--accent);" id="resumo-loading-count">[ 0 / ${totalEsperado} ]</span>
-      </div>
-      <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:999px; overflow:hidden;">
-        <div id="resumo-loading-bar" style="width:25%; height:100%; background:linear-gradient(90deg, #00f0ff, #7928ca); border-radius:999px; transition:width 0.2s ease;"></div>
-      </div>
-    </div>`;
+  const listaEl = $("#lista");
+  if (listaEl) listaEl.innerHTML = "";
+
+  const resumoEl = $("#resumo");
+  if (resumoEl) {
+    resumoEl.innerHTML = `
+      <div class="health-loading" style="display:flex; flex-direction:column; gap:10px; width:100%;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:600;"><span class="pulse-spinner"></span> Auditando catálogo de ajustes do sistema (${esc(perfil)})…</span>
+          <span class="mono bold" style="color:var(--accent);" id="resumo-loading-count">[ 0 / ${totalEsperado} ]</span>
+        </div>
+        <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:999px; overflow:hidden;">
+          <div id="resumo-loading-bar" style="width:25%; height:100%; background:linear-gradient(90deg, #00f0ff, #7928ca); border-radius:999px; transition:width 0.2s ease;"></div>
+        </div>
+      </div>`;
+  }
 
   Visualizer.log({
     type: "read",
@@ -538,10 +578,12 @@ async function diagnosticar(isBoot = false) {
   ultimoDiagnostico = d;
 
   try {
-    renderVisaoGeral(await App.ResumoVisao(perfil));
+    const visao = (App && typeof App.ResumoVisao === "function") 
+      ? await App.ResumoVisao(perfil) 
+      : gerarVisaoGeralDeDiagnostico(d);
+    renderVisaoGeral(visao || gerarVisaoGeralDeDiagnostico(d));
   } catch (e) {
-    const painel = $("#visao-geral");
-    if (painel) painel.innerHTML = '<p class="overview-unavailable">A vis\u00e3o geral estar\u00e1 dispon\u00edvel na pr\u00f3xima atualiza\u00e7\u00e3o.</p>';
+    renderVisaoGeral(gerarVisaoGeralDeDiagnostico(d));
   }
 
   // Stream de eventos simulados da leitura de cada chave do registro

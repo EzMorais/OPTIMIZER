@@ -3,12 +3,16 @@ package telemetry
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"optimizer/internal/console"
 )
 
 // Provider define o contrato para amostragem de telemetria de hardware.
@@ -46,8 +50,23 @@ type psTelemetryRaw struct {
 	NetRxKB       float64 `json:"netRxKB"`
 	NetTxKB       float64 `json:"netTxKB"`
 	TopCPUProc    string  `json:"topCpuProc"`
+	TopCPUPID     int     `json:"topCpuPid"`
 	TopCPUVal     float64 `json:"topCpuVal"`
+	TopCPUMemory  uint64  `json:"topCpuMemoryBytes"`
 	TopGPUProc    string  `json:"topGpuProc"`
+}
+
+func normalizeProcessCPU(value float64, logical int) float64 {
+	if logical < 1 {
+		logical = 1
+	}
+	percent := value / float64(logical)
+	percent = math.Min(100, math.Max(0, percent))
+	return math.Round(percent*10) / 10
+}
+
+func clampPercent(value float64) float64 {
+	return math.Min(100, math.Max(0, value))
 }
 
 // CollectSample coleta uma amostra real do sistema via contadores e WMI.
@@ -62,8 +81,9 @@ func (p *WindowsLiveProvider) CollectSample(ctx context.Context) (MetricSample, 
 $ErrorActionPreference = 'SilentlyContinue'
 $cpu = 0
 try {
-    $cpuSample = (Get-Counter '\Processor(_Total)\% Processor Time' -ErrorAction SilentlyContinue).CounterSamples[0].CookedValue
-    if ($cpuSample) { $cpu = [math]::Round($cpuSample, 1) }
+    # CIM usa nomes de propriedades estáveis e não depende do idioma do Windows.
+    $cpuSamples = Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -ErrorAction SilentlyContinue | Measure-Object -Property PercentProcessorTime -Average
+    if ($cpuSamples -and $null -ne $cpuSamples.Average) { $cpu = [math]::Round([double]$cpuSamples.Average, 1) }
 } catch {}
 
 $ramTotal = 0
@@ -79,20 +99,28 @@ try {
 
 $gpuUsage = 0
 try {
-    $gpuCounters = (Get-Counter '\GPU Engine(*)\Utilization Percentage' -ErrorAction SilentlyContinue).CounterSamples
+    # A classe CIM evita contadores localizados e funciona sem o módulo de
+    # contadores de desempenho carregado no idioma do usuário.
+    $gpuCounters = Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine -ErrorAction SilentlyContinue
     if ($gpuCounters) {
-        $maxGpu = ($gpuCounters | Measure-Object -Property CookedValue -Maximum).Maximum
-        if ($maxGpu) { $gpuUsage = [math]::Round($maxGpu, 1) }
+        $maxGpu = ($gpuCounters | Measure-Object -Property UtilizationPercentage -Maximum).Maximum
+        if ($null -ne $maxGpu) { $gpuUsage = [math]::Round([double]$maxGpu, 1) }
     }
 } catch {}
 
 $topCpuName = ""
+$topCpuPid = 0
 $topCpuVal = 0
+$topCpuMemoryBytes = 0
 try {
-    $topP = Get-Process | Sort-Object CPU -Descending | Select-Object -First 1
+    $topP = Get-CimInstance Win32_PerfFormattedData_PerfProc_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.IDProcess -gt 0 -and $_.Name -notin @('_Total', 'Idle') } |
+        Sort-Object PercentProcessorTime -Descending | Select-Object -First 1
     if ($topP) {
-        $topCpuName = $topP.ProcessName
-        $topCpuVal = [math]::Round($topP.CPU, 1)
+        $topCpuName = $topP.Name
+        $topCpuPid = [int]$topP.IDProcess
+        $topCpuVal = [double]$topP.PercentProcessorTime
+        $topCpuMemoryBytes = [uint64]$topP.WorkingSetPrivate
     }
 } catch {}
 
@@ -131,26 +159,28 @@ try {
     hasGpuTemp = $hasGpuTemp
     throttling = $false
     topCpuProc = $topCpuName
+    topCpuPid = $topCpuPid
     topCpuVal = $topCpuVal
+    topCpuMemoryBytes = $topCpuMemoryBytes
     topGpuProc = ""
 } | ConvertTo-Json -Compress
 `
 
 	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", psScript)
+	console.HideWindow(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		// Retorno com valores mínimos estruturados caso ocorra timeout/cancelamento
-		sample.RAMTotalMB = float64(runtime.NumCPU() * 2048)
-		return sample, nil
+		return sample, err
 	}
 
 	var raw psTelemetryRaw
 	if err := json.Unmarshal(out, &raw); err == nil {
-		sample.CPUUsagePercent = raw.CPUUsage
+		sample.CPUUsagePercent = clampPercent(raw.CPUUsage)
 		sample.CPUFrequencyMHz = raw.CPUFreq
 		sample.RAMUsedMB = raw.RAMUsedMB
 		sample.RAMTotalMB = raw.RAMTotalMB
-		sample.GPUUsagePercent = raw.GPUUsage
+		sample.GPUUsagePercent = clampPercent(raw.GPUUsage)
 		sample.GPUMemoryUsedMB = raw.GPUMemUsedMB
 		sample.GPUMemoryTotalMB = raw.GPUMemTotalMB
 		sample.ThermalThrottling = raw.Throttling
@@ -171,11 +201,15 @@ try {
 		if raw.TopCPUProc != "" {
 			sample.TopProcessesCPU = []ProcessMetric{
 				{
+					PID:     raw.TopCPUPID,
 					Name:    raw.TopCPUProc,
-					Percent: raw.TopCPUVal,
+					Percent: normalizeProcessCPU(raw.TopCPUVal, runtime.NumCPU()),
+					Memory:  raw.TopCPUMemory,
 				},
 			}
 		}
+	} else {
+		return sample, fmt.Errorf("PowerShell retornou telemetria inválida: %w", err)
 	}
 
 	return sample, nil
@@ -213,6 +247,7 @@ $gpu = Get-CimInstance Win32_VideoController | Select-Object -First 1
 } | ConvertTo-Json -Compress
 `
 	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", psScript)
+	console.HideWindow(cmd)
 	out, err := cmd.Output()
 	if err == nil {
 		var raw struct {

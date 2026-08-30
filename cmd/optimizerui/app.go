@@ -3,14 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"os/exec"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"optimizer/internal/console"
 	"optimizer/internal/cpudiag"
 	"optimizer/internal/diskdiag"
 	"optimizer/internal/elevate"
@@ -37,6 +41,8 @@ type App struct {
 
 	// Sessão de telemetria e benchmark
 	benchMu           sync.Mutex
+	hardwareMu        sync.Mutex
+	hardwareInfo      *telemetry.HardwareStaticInfo
 	benchCancel       context.CancelFunc
 	benchCollector    *telemetry.Collector
 	ultimoReportAntes map[string]telemetry.BenchmarkReport
@@ -65,8 +71,10 @@ func (a *App) startup(ctx context.Context) {
 		store, _ = history.Open("history.jsonl")
 	}
 
+	registry := tweaks.Build(winreg.NewLive())
+	registerPendingMTU(registry, store)
 	a.eng = &engine.Engine{
-		Registry: tweaks.Build(winreg.NewLive()),
+		Registry: registry,
 		History:  store,
 		Elevated: elevate.IsElevated(),
 	}
@@ -76,21 +84,77 @@ func (a *App) startup(ctx context.Context) {
 	a.dnsRunner = netdiag.LiveDNSRunner{}
 }
 
+// registerPendingMTU rehydrates runtime-created MTU tweaks before the engine
+// reads pending history, making rollback survive an application restart.
+func registerPendingMTU(registry *tweak.Registry, store *history.Store) {
+	if registry == nil || store == nil {
+		return
+	}
+	pending, err := store.Pending()
+	if err != nil {
+		return
+	}
+	interfaces, err := netdiag.Interfaces()
+	if err != nil {
+		return
+	}
+	for id, entry := range pending {
+		if !strings.HasPrefix(id, "rede.mtu.") || len(id) != len("rede.mtu.")+16 {
+			continue
+		}
+		luid, err := strconv.ParseUint(strings.TrimPrefix(id, "rede.mtu."), 16, 64)
+		if err != nil {
+			continue
+		}
+		target, ok := entry.Snapshot["mtu.destino"]
+		if !ok {
+			matches := regexp.MustCompile(`para (\d+)`).FindStringSubmatch(entry.Detail)
+			if len(matches) != 2 {
+				continue
+			}
+			target = matches[1]
+		}
+		var targetMTU uint32
+		switch v := target.(type) {
+		case float64:
+			targetMTU = uint32(v)
+		case uint32:
+			targetMTU = v
+		case string:
+			parsed, parseErr := strconv.ParseUint(v, 10, 32)
+			if parseErr == nil {
+				targetMTU = uint32(parsed)
+			}
+		}
+		if targetMTU == 0 {
+			continue
+		}
+		for _, iface := range interfaces {
+			if iface.Luid == luid {
+				tw := netdiag.MTUTweak{Iface: iface, Target: targetMTU, Ctl: netdiag.LiveMTU{}, Host: "histórico"}
+				registry.Register(tw, tweak.Meta{Enabled: true, Profiles: tweak.ProfileBoth, RequiresAdmin: true, DisplayName: tw.Name(), Evidence: "docs/catalogo/rede.md#5-mtu"})
+				break
+			}
+		}
+	}
+}
+
 // ---------------------------------------------------------------- tipos da UI
 
 type ItemUI struct {
-	ID           string `json:"id"`
-	Nome         string `json:"nome"`
-	Descricao    string `json:"descricao"`
-	Ressalva     string `json:"ressalva"`
-	Categoria    string `json:"categoria"`
-	Risco        string `json:"risco"`
-	PrecisaAdmin bool   `json:"precisaAdmin"`
-	Recomendado  bool   `json:"recomendado"`
-	Estado       string `json:"estado"`
-	Detalhe      string `json:"detalhe"`
-	PodeDesfazer bool   `json:"podeDesfazer"`
-	Base         string `json:"base"`
+	ID                 string `json:"id"`
+	Nome               string `json:"nome"`
+	Descricao          string `json:"descricao"`
+	Ressalva           string `json:"ressalva"`
+	Categoria          string `json:"categoria"`
+	Risco              string `json:"risco"`
+	PrecisaAdmin       bool   `json:"precisaAdmin"`
+	Recomendado        bool   `json:"recomendado"`
+	MotivoRecomendacao string `json:"motivoRecomendacao,omitempty"`
+	Estado             string `json:"estado"`
+	Detalhe            string `json:"detalhe"`
+	PodeDesfazer       bool   `json:"podeDesfazer"`
+	Base               string `json:"base"`
 }
 
 type DiagnosticoUI struct {
@@ -158,6 +222,24 @@ type MTUUI struct {
 	Erro         string    `json:"erro"`
 }
 
+type RedeConfigUI struct {
+	Adaptador     string   `json:"adaptador"`
+	MTU           uint32   `json:"mtu"`
+	MSSIPv4       uint32   `json:"mssIPv4"`
+	MSSIPv6       uint32   `json:"mssIPv6"`
+	IDsOtimizacao []string `json:"idsOtimizacao"`
+}
+
+type RedeConfigValidadaUI struct {
+	Valida    bool     `json:"valida"`
+	Mensagem  string   `json:"mensagem"`
+	Adaptador string   `json:"adaptador"`
+	MTU       uint32   `json:"mtu"`
+	MSSIPv4   uint32   `json:"mssIPv4"`
+	MSSIPv6   uint32   `json:"mssIPv6"`
+	Comandos  []string `json:"comandos"`
+}
+
 type EntradaUI struct {
 	Quando    string `json:"quando"`
 	Acao      string `json:"acao"`
@@ -165,6 +247,12 @@ type EntradaUI struct {
 	Resultado string `json:"resultado"`
 	Ok        bool   `json:"ok"`
 }
+
+type ResultadoAcaoUI struct {
+	OK       bool   `json:"ok"`
+	Mensagem string `json:"mensagem"`
+}
+
 
 // ------------------------------------------------------------------ bindings
 
@@ -176,17 +264,20 @@ func (a *App) Diagnosticar(perfil string) DiagnosticoUI {
 	}
 
 	out := DiagnosticoUI{Perfil: p.String(), Admin: a.eng.Elevated, CaminhoHistorico: a.eng.History.Path()}
+	hardware := a.hardwareForRecommendation()
 	for _, s := range a.eng.Scan(a.ctx, p) {
+		recomendado, motivo := recommendationForHardware(s.Meta, hardware)
 		item := ItemUI{
-			ID:           s.Meta.ID,
-			Nome:         s.Meta.DisplayName,
-			Descricao:    s.Meta.Description,
-			Ressalva:     s.Meta.Caveat,
-			PrecisaAdmin: s.Meta.RequiresAdmin,
-			Recomendado:  s.Meta.RecommendedDefault,
-			Detalhe:      s.Detail,
-			PodeDesfazer: s.CanUndo,
-			Base:         s.Meta.Evidence,
+			ID:                 s.Meta.ID,
+			Nome:               s.Meta.DisplayName,
+			Descricao:          s.Meta.Description,
+			Ressalva:           s.Meta.Caveat,
+			PrecisaAdmin:       s.Meta.RequiresAdmin,
+			Recomendado:        recomendado,
+			MotivoRecomendacao: motivo,
+			Detalhe:            s.Detail,
+			PodeDesfazer:       s.CanUndo,
+			Base:               s.Meta.Evidence,
 		}
 		if t, ok := a.eng.Registry.Known(s.Meta.ID); ok {
 			item.Categoria = tweak.CategoryLabel(t.Category())
@@ -202,7 +293,7 @@ func (a *App) Diagnosticar(perfil string) DiagnosticoUI {
 			item.Estado = "parcial"
 		default:
 			item.Estado = "nao_aplicado"
-			if s.Meta.RecommendedDefault {
+			if recomendado {
 				out.RecomendadosPendentes++
 			}
 		}
@@ -214,6 +305,44 @@ func (a *App) Diagnosticar(perfil string) DiagnosticoUI {
 		out.PendentesDesfazer = len(pend)
 	}
 	return out
+}
+
+func (a *App) hardwareForRecommendation() *telemetry.HardwareStaticInfo {
+	a.hardwareMu.Lock()
+	defer a.hardwareMu.Unlock()
+	if a.hardwareInfo != nil {
+		copy := *a.hardwareInfo
+		return &copy
+	}
+	provider := telemetry.Provider(telemetry.NewWindowsLiveProvider())
+	if a.benchCollector != nil && a.benchCollector.Provider != nil {
+		provider = a.benchCollector.Provider
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	info, err := provider.GetHardwareInfo(ctx)
+	if err != nil {
+		return nil
+	}
+	a.hardwareInfo = &info
+	copy := info
+	return &copy
+}
+
+func recommendationForHardware(meta tweak.Meta, hardware *telemetry.HardwareStaticInfo) (bool, string) {
+	if !meta.RecommendedDefault {
+		return false, "Disponível para aplicação manual; não é recomendado por padrão."
+	}
+	if hardware != nil && strings.Contains(strings.ToLower(meta.ID), "nvidia") {
+		gpu := strings.ToLower(hardware.GPUName)
+		if !strings.Contains(gpu, "nvidia") {
+			return false, "Não recomendado: este PC não reportou uma GPU NVIDIA compatível."
+		}
+	}
+	if hardware != nil && hardware.TotalRAMMB > 0 && hardware.TotalRAMMB < 4096 && strings.Contains(meta.ID, "disable-paging") {
+		return false, "Não recomendado: o PC tem pouca RAM para este ajuste."
+	}
+	return true, "Recomendado para o hardware detectado; confirme a simulação antes de aplicar."
 }
 
 // ResumoVisao consolida o diagnóstico atual em dados prontos para gráficos e
@@ -406,6 +535,81 @@ func (a *App) AplicarMTU(simular bool) []ResultadoUI {
 	})
 	a.eng.CreateRestorePoint = nil
 	return traduzir(a.eng.Apply(a.ctx, []string{tw.ID()}, simular))
+}
+
+// ObterConfiguracaoRede devolve a interface de saída e os valores calculados
+// para o editor de MTU/MSS. A leitura não altera a máquina.
+func (a *App) ObterConfiguracaoRede() RedeConfigUI {
+	addr, err := netdiag.Resolve("8.8.8.8")
+	if err != nil {
+		return RedeConfigUI{}
+	}
+	iface, err := netdiag.OutboundInterface(addr)
+	if err != nil || iface == nil {
+		return RedeConfigUI{}
+	}
+	v, err := netdiag.ValidateNetworkConfig(netdiag.NetworkConfig{MTU: iface.MTU})
+	if err != nil {
+		return RedeConfigUI{}
+	}
+	return RedeConfigUI{Adaptador: iface.Name, MTU: v.MTU, MSSIPv4: v.MSSIPv4, MSSIPv6: v.MSSIPv6}
+}
+
+// ValidarConfiguracaoRede valida os campos editáveis e mostra os comandos
+// equivalentes. Os comandos são informativos; a aplicação usa APIs nativas e
+// o catálogo transacional do app.
+func (a *App) ValidarConfiguracaoRede(cfg RedeConfigUI) RedeConfigValidadaUI {
+	if strings.TrimSpace(cfg.Adaptador) == "" {
+		return RedeConfigValidadaUI{Mensagem: "Informe um adaptador de rede válido."}
+	}
+	v, err := netdiag.ValidateNetworkConfig(netdiag.NetworkConfig{MTU: cfg.MTU, MSSIPv4: cfg.MSSIPv4, MSSIPv6: cfg.MSSIPv6})
+	if err != nil {
+		return RedeConfigValidadaUI{Mensagem: err.Error()}
+	}
+	cmd := fmt.Sprintf("netsh interface ipv4 set subinterface name=\"%s\" mtu=%d store=persistent", strings.ReplaceAll(cfg.Adaptador, "\"", ""), v.MTU)
+	return RedeConfigValidadaUI{Valida: true, Mensagem: netdiag.ManualMTUDescription(v.MTU), Adaptador: cfg.Adaptador, MTU: v.MTU, MSSIPv4: v.MSSIPv4, MSSIPv6: v.MSSIPv6, Comandos: []string{cmd}}
+}
+
+// AplicarConfiguracaoRede aplica o MTU editado e, opcionalmente, os IDs de
+// otimização de rede já existentes no catálogo. Não executa texto arbitrário.
+func (a *App) AplicarConfiguracaoRede(cfg RedeConfigUI, simular bool) []ResultadoUI {
+	valid := a.ValidarConfiguracaoRede(cfg)
+	if !valid.Valida {
+		return []ResultadoUI{{Estado: "falhou", Mensagem: valid.Mensagem}}
+	}
+	ifs, err := netdiag.Interfaces()
+	if err != nil {
+		return []ResultadoUI{{Estado: "falhou", Mensagem: err.Error()}}
+	}
+	var iface *netdiag.Interface
+	for i := range ifs {
+		if ifs[i].Name == cfg.Adaptador {
+			iface = &ifs[i]
+			break
+		}
+	}
+	if iface == nil {
+		return []ResultadoUI{{Estado: "falhou", Mensagem: "Adaptador de rede não encontrado ou desconectado."}}
+	}
+	var out []ResultadoUI
+	if iface.MTU != valid.MTU {
+		tw, err := netdiag.NewManualMTUTweak(*iface, valid.MTU, netdiag.LiveMTU{})
+		if err != nil {
+			return []ResultadoUI{{Estado: "falhou", Mensagem: err.Error()}}
+		}
+		if !a.eng.Elevated && !simular {
+			return []ResultadoUI{{Estado: "pulado", Nome: tw.Name(), Mensagem: "alterar o MTU exige permissão de administrador"}}
+		}
+		a.eng.Registry.Register(tw, tweak.Meta{Enabled: true, Profiles: tweak.ProfileBoth, RequiresAdmin: true, Evidence: "docs/catalogo/rede.md#5-mtu"})
+		out = append(out, traduzir(a.eng.Apply(a.ctx, []string{tw.ID()}, simular))...)
+	}
+	if len(cfg.IDsOtimizacao) > 0 {
+		out = append(out, a.Aplicar(cfg.IDsOtimizacao, simular, false)...)
+	}
+	if len(out) == 0 {
+		out = append(out, ResultadoUI{Estado: "pulado", Mensagem: "A configuração já está aplicada; nenhuma alteração foi necessária."})
+	}
+	return out
 }
 
 // Historico devolve tudo que o app já alterou nesta máquina, do mais novo para
@@ -671,12 +875,30 @@ func (a *App) RelatorioComparativo(antes, depois BenchmarkUI) ComparativoUI {
 
 // ListarInicializacao lista programas configurados para iniciar com o Windows.
 func (a *App) ListarInicializacao() []systemdiag.StartupItem {
-	b := winreg.NewLive()
-	itens, err := systemdiag.ListarStartupItems(b)
-	if err != nil {
+	// O backend de Registro pode bloquear em máquinas com política corporativa
+	// ou perfil de usuário indisponível. Nunca deixe a UI aguardando sem fim.
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(baseCtx, 4*time.Second)
+	defer cancel()
+	resultado := make(chan []systemdiag.StartupItem, 1)
+	go func() {
+		b := winreg.NewLive()
+		itens, err := systemdiag.ListarStartupItemsContext(ctx, b)
+		if err != nil {
+			resultado <- []systemdiag.StartupItem{}
+			return
+		}
+		resultado <- itens
+	}()
+	select {
+	case itens := <-resultado:
+		return itens
+	case <-ctx.Done():
 		return []systemdiag.StartupItem{}
 	}
-	return itens
 }
 
 // AlternarInicializacao ativa ou desativa um programa de inicialização.
@@ -720,7 +942,7 @@ func (a *App) AtivarPlanoEnergia(guid string) string {
 
 // ListarDiscos audita e lista os volumes e tipos de mídia instalados.
 func (a *App) ListarDiscos() []diskdiag.DriveInfo {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	drives, err := diskdiag.ListarUnidades(ctx)
 	if err != nil {
@@ -848,30 +1070,37 @@ func (a *App) LimparDispositivosFantasmas(instanceIDs []string) ResultadoLimpeza
 
 // TelemetriaAoVivoUI agrega métricas em tempo real para os gráficos da UI.
 type TelemetriaAoVivoUI struct {
-	Timestamp         int64                     `json:"timestamp"`
-	CPUUsagePercent   float64                   `json:"cpuUsagePercent"`
-	CPUFrequencyMHz   float64                   `json:"cpuFrequencyMhz"`
-	CPUTempCelsius    *float64                  `json:"cpuTempCelsius,omitempty"`
-	GPUUsagePercent   float64                   `json:"gpuUsagePercent"`
-	GPUMemoryUsedMB   float64                   `json:"gpuMemoryUsedMb"`
-	GPUMemoryTotalMB  float64                   `json:"gpuMemoryTotalMb"`
-	GPUTempCelsius    *float64                  `json:"gpuTempCelsius,omitempty"`
-	RAMUsedMB         float64                   `json:"ramUsedMb"`
-	RAMTotalMB        float64                   `json:"ramTotalMb"`
-	RAMUsedPercent    float64                   `json:"ramUsedPercent"`
-	ThermalThrottled  bool                      `json:"thermalThrottled"`
-	DiskReadMBps      float64                   `json:"diskReadMBps"`
-	DiskWriteMBps     float64                   `json:"diskWriteMBps"`
-	NetworkRxKBps     float64                   `json:"networkRxKBps"`
-	NetworkTxKBps     float64                   `json:"networkTxKBps"`
-	PhysicalCores     int                       `json:"physicalCores"`
-	LogicalProcessors int                       `json:"logicalProcessors"`
-	TopProcesses      []telemetry.ProcessMetric `json:"topProcesses"`
+	Erro                   string                    `json:"erro,omitempty"`
+	Timestamp              int64                     `json:"timestamp"`
+	CPUUsagePercent        float64                   `json:"cpuUsagePercent"`
+	CPUFrequencyMHz        float64                   `json:"cpuFrequencyMhz"`
+	CPUFrequencyAvailable  bool                      `json:"cpuFrequencyAvailable"`
+	CPUTempCelsius         *float64                  `json:"cpuTempCelsius,omitempty"`
+	GPUUsagePercent        float64                   `json:"gpuUsagePercent"`
+	GPUMemoryUsedMB        float64                   `json:"gpuMemoryUsedMb"`
+	GPUMemoryTotalMB       float64                   `json:"gpuMemoryTotalMb"`
+	GPUMemoryAvailable     bool                      `json:"gpuMemoryAvailable"`
+	GPUTempCelsius         *float64                  `json:"gpuTempCelsius,omitempty"`
+	RAMUsedMB              float64                   `json:"ramUsedMb"`
+	RAMTotalMB             float64                   `json:"ramTotalMb"`
+	RAMUsedPercent         float64                   `json:"ramUsedPercent"`
+	ThermalThrottled       bool                      `json:"thermalThrottled"`
+	ThermalStatusAvailable bool                      `json:"thermalStatusAvailable"`
+	DiskReadMBps           float64                   `json:"diskReadMBps"`
+	DiskWriteMBps          float64                   `json:"diskWriteMBps"`
+	NetworkRxKBps          float64                   `json:"networkRxKBps"`
+	NetworkTxKBps          float64                   `json:"networkTxKBps"`
+	PhysicalCores          int                       `json:"physicalCores"`
+	LogicalProcessors      int                       `json:"logicalProcessors"`
+	TopProcesses           []telemetry.ProcessMetric `json:"topProcesses"`
 }
 
 // ObterTelemetriaAoVivo captura um snapshot instantâneo do hardware para os gráficos da UI.
 func (a *App) ObterTelemetriaAoVivo() TelemetriaAoVivoUI {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// CIM/PowerShell pode levar alguns segundos na primeira chamada, sobretudo
+	// quando o contador de GPU é inicializado. Um timeout de 2s causava falsos
+	// "indisponível" no polling de 1s.
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 
 	var provider telemetry.Provider = telemetry.NewWindowsLiveProvider()
@@ -883,6 +1112,7 @@ func (a *App) ObterTelemetriaAoVivo() TelemetriaAoVivoUI {
 	if err != nil {
 		return TelemetriaAoVivoUI{
 			Timestamp: time.Now().Unix(),
+			Erro:      err.Error(),
 		}
 	}
 
@@ -891,34 +1121,34 @@ func (a *App) ObterTelemetriaAoVivo() TelemetriaAoVivoUI {
 	if ramTotal == 0 {
 		ramTotal = sample.RAMTotalMB
 	}
-	if ramTotal == 0 {
-		ramTotal = 16384
-	}
 	ramPercent := 0.0
 	if ramTotal > 0 {
-		ramPercent = (sample.RAMUsedMB / ramTotal) * 100
+		ramPercent = math.Min(100, math.Max(0, (sample.RAMUsedMB/ramTotal)*100))
 	}
 
 	return TelemetriaAoVivoUI{
-		Timestamp:         sample.Timestamp.Unix(),
-		CPUUsagePercent:   sample.CPUUsagePercent,
-		CPUFrequencyMHz:   sample.CPUFrequencyMHz,
-		CPUTempCelsius:    sample.CPUTempCelsius,
-		GPUUsagePercent:   sample.GPUUsagePercent,
-		GPUMemoryUsedMB:   sample.GPUMemoryUsedMB,
-		GPUMemoryTotalMB:  float64(staticInfo.TotalGPUMemMB),
-		GPUTempCelsius:    sample.GPUTempCelsius,
-		RAMUsedMB:         sample.RAMUsedMB,
-		RAMTotalMB:        ramTotal,
-		RAMUsedPercent:    ramPercent,
-		ThermalThrottled:  sample.ThermalThrottling,
-		DiskReadMBps:      sample.DiskReadMBps,
-		DiskWriteMBps:     sample.DiskWriteMBps,
-		NetworkRxKBps:     sample.NetworkRxKBps,
-		NetworkTxKBps:     sample.NetworkTxKBps,
-		PhysicalCores:     staticInfo.PhysicalCores,
-		LogicalProcessors: staticInfo.LogicalCores,
-		TopProcesses:      sample.TopProcessesCPU,
+		Timestamp:              sample.Timestamp.Unix(),
+		CPUUsagePercent:        math.Min(100, math.Max(0, sample.CPUUsagePercent)),
+		CPUFrequencyMHz:        sample.CPUFrequencyMHz,
+		CPUFrequencyAvailable:  sample.CPUFrequencyMHz > 0,
+		CPUTempCelsius:         sample.CPUTempCelsius,
+		GPUUsagePercent:        math.Min(100, math.Max(0, sample.GPUUsagePercent)),
+		GPUMemoryUsedMB:        sample.GPUMemoryUsedMB,
+		GPUMemoryTotalMB:       float64(staticInfo.TotalGPUMemMB),
+		GPUMemoryAvailable:     staticInfo.TotalGPUMemMB > 0,
+		GPUTempCelsius:         sample.GPUTempCelsius,
+		RAMUsedMB:              sample.RAMUsedMB,
+		RAMTotalMB:             ramTotal,
+		RAMUsedPercent:         ramPercent,
+		ThermalThrottled:       sample.ThermalThrottling,
+		ThermalStatusAvailable: false,
+		DiskReadMBps:           sample.DiskReadMBps,
+		DiskWriteMBps:          sample.DiskWriteMBps,
+		NetworkRxKBps:          sample.NetworkRxKBps,
+		NetworkTxKBps:          sample.NetworkTxKBps,
+		PhysicalCores:          staticInfo.PhysicalCores,
+		LogicalProcessors:      staticInfo.LogicalCores,
+		TopProcesses:           sample.TopProcessesCPU,
 	}
 }
 
@@ -1005,14 +1235,20 @@ func (a *App) AplicarPerfilUso(key string, dryRun bool) []ResultadoUI {
 			_ = systemdiag.AtivarPlanoEnergia(ctx, p.PowerPlanGUID)
 		}
 		if p.DisableSleepAC {
-			_ = exec.CommandContext(ctx, "powercfg", "/change", "standby-timeout-ac", "0").Run()
+			cmd := exec.CommandContext(ctx, "powercfg", "/change", "standby-timeout-ac", "0")
+			console.HideWindow(cmd)
+			_ = cmd.Run()
 		}
 		// Pausa ou retomada de serviços
 		for _, s := range p.ServicesToPause {
-			_ = exec.CommandContext(ctx, "net", "stop", s, "/y").Run()
+			cmd := exec.CommandContext(ctx, "net", "stop", s, "/y")
+			console.HideWindow(cmd)
+			_ = cmd.Run()
 		}
 		for _, s := range p.ServicesToEnsure {
-			_ = exec.CommandContext(ctx, "net", "start", s).Run()
+			cmd := exec.CommandContext(ctx, "net", "start", s)
+			console.HideWindow(cmd)
+			_ = cmd.Run()
 		}
 	}
 
@@ -1056,8 +1292,12 @@ func (a *App) RestaurarPerfilUso(key string) []ResultadoUI {
 
 	// Retoma serviços e restaura plano equilibrado se for jogo
 	if key == "jogo" {
-		_ = exec.CommandContext(ctx, "net", "start", "WSearch").Run()
-		_ = exec.CommandContext(ctx, "net", "start", "SysMain").Run()
+		cmd := exec.CommandContext(ctx, "net", "start", "WSearch")
+		console.HideWindow(cmd)
+		_ = cmd.Run()
+		cmd = exec.CommandContext(ctx, "net", "start", "SysMain")
+		console.HideWindow(cmd)
+		_ = cmd.Run()
 		_ = systemdiag.AtivarPlanoEnergia(ctx, "381b4222-f694-41f0-9685-ff5bb260df2e")
 	}
 
@@ -1219,13 +1459,19 @@ func (a *App) AplicarPerfilComBenchmark(key string, dryRun bool, reportAntes tel
 			_ = systemdiag.AtivarPlanoEnergia(ctx, p.PowerPlanGUID)
 		}
 		if p.DisableSleepAC {
-			_ = exec.CommandContext(ctx, "powercfg", "/change", "standby-timeout-ac", "0").Run()
+			cmd := exec.CommandContext(ctx, "powercfg", "/change", "standby-timeout-ac", "0")
+			console.HideWindow(cmd)
+			_ = cmd.Run()
 		}
 		for _, s := range p.ServicesToPause {
-			_ = exec.CommandContext(ctx, "net", "stop", s, "/y").Run()
+			cmd := exec.CommandContext(ctx, "net", "stop", s, "/y")
+			console.HideWindow(cmd)
+			_ = cmd.Run()
 		}
 		for _, s := range p.ServicesToEnsure {
-			_ = exec.CommandContext(ctx, "net", "start", s).Run()
+			cmd := exec.CommandContext(ctx, "net", "start", s)
+			console.HideWindow(cmd)
+			_ = cmd.Run()
 		}
 
 		// Registra o relatório prévio no histórico junto ao lote
@@ -1325,3 +1571,78 @@ func (a *App) IniciarBenchmarkPos(perfilKey string, batchID string, segundos int
 
 	return comp, err
 }
+
+// ObterTimerResolution consulta a resolução do temporizador do kernel (em milissegundos).
+func (a *App) ObterTimerResolution() systemdiag.TimerResolutionInfo {
+	info, _ := systemdiag.ObterTimerResolution()
+	return info
+}
+
+// DefinirTimerResolution ativa ou restaura resolução de alta precisão (ex: 0.500 ms).
+func (a *App) DefinirTimerResolution(desiredMs float64, ativar bool) ResultadoAcaoUI {
+	res, err := systemdiag.DefinirTimerResolution(desiredMs, ativar)
+	if err != nil {
+		return ResultadoAcaoUI{OK: false, Mensagem: fmt.Sprintf("Falha ao ajustar resolução: %v", err)}
+	}
+	if ativar {
+		return ResultadoAcaoUI{OK: true, Mensagem: fmt.Sprintf("Temporizador ajustado para %.3f ms com sucesso.", res)}
+	}
+	return ResultadoAcaoUI{OK: true, Mensagem: "Temporizador restaurado para o padrão do Windows."}
+}
+
+// MedirSleepPrecision executa o teste de jitter medindo o desvio da chamada Sleep (MeasureSleep).
+func (a *App) MedirSleepPrecision(samples int) systemdiag.SleepPrecisionResult {
+	if samples <= 0 {
+		samples = 20
+	}
+	return systemdiag.MedirSleepPrecision(samples)
+}
+
+// ListarDispositivosMSI lista os adaptadores PCIe (GPU, Rede, USB) e reporta status MSI/Line-Based IRQ.
+func (a *App) ListarDispositivosMSI() []systemdiag.DispositivoMSI {
+	baseCtx := a.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(baseCtx, 5*time.Second)
+	defer cancel()
+	devs, err := systemdiag.ListarDispositivosMSI(ctx)
+	if err != nil {
+		return []systemdiag.DispositivoMSI{}
+	}
+	return devs
+}
+
+// AlternarModoMSI ativa ou desativa o modo MSI para um dispositivo específico no registro.
+func (a *App) AlternarModoMSI(caminhoRegistro string, ativar bool) ResultadoAcaoUI {
+	if a.eng == nil || !a.eng.Elevated {
+		return ResultadoAcaoUI{OK: false, Mensagem: "Alterar o modo MSI de interrupção exige permissão de administrador."}
+	}
+	b := winreg.NewLive()
+	err := systemdiag.AlternarModoMSI(b, caminhoRegistro, ativar)
+	if err != nil {
+		return ResultadoAcaoUI{OK: false, Mensagem: fmt.Sprintf("Erro ao alternar modo MSI: %v", err)}
+	}
+	msg := "Modo MSI desativado (retornou para Line-Based IRQ clássico)."
+	if ativar {
+		msg = "Modo MSI ativado com sucesso. O efeito completo ocorre após reiniciar o driver ou o computador."
+	}
+	return ResultadoAcaoUI{OK: true, Mensagem: msg}
+}
+
+// ConfigurarPersistenciaTimer ativa ou desativa a persistência do timer em segundo plano na inicialização.
+func (a *App) ConfigurarPersistenciaTimer(ativar bool, desiredMs float64) ResultadoAcaoUI {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := systemdiag.ConfigurarPersistenciaTimer(ctx, ativar, desiredMs)
+	if err != nil {
+		return ResultadoAcaoUI{OK: false, Mensagem: fmt.Sprintf("Erro ao configurar persistência: %v", err)}
+	}
+	if ativar {
+		return ResultadoAcaoUI{OK: true, Mensagem: "Temporizador de 0.5ms fixado para persistir no Windows (mesmo com o app fechado)."}
+	}
+	return ResultadoAcaoUI{OK: true, Mensagem: "Persistência do temporizador em segundo plano desativada."}
+}
+
+

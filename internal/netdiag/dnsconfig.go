@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"optimizer/internal/console"
 )
 
 // DNSAtual descreve os servidores DNS IPv4 usados pela interface que carrega
@@ -28,7 +30,9 @@ type DNSRunner interface {
 type LiveDNSRunner struct{}
 
 func (LiveDNSRunner) RunPowerShell(ctx context.Context, script string) ([]byte, error) {
-	out, err := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
+	console.HideWindow(cmd)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("PowerShell: %w: %s", err, strings.TrimSpace(string(out)))
 	}

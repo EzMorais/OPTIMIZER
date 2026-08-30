@@ -4,6 +4,8 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+
+	"optimizer/internal/console"
 )
 
 // PowerPlan representa um plano de energia do Windows.
@@ -16,6 +18,7 @@ type PowerPlan struct {
 // ListarPlanosEnergia lista os esquemas de energia instalados via powercfg.
 func ListarPlanosEnergia(ctx context.Context) ([]PowerPlan, error) {
 	cmd := exec.CommandContext(ctx, "powercfg", "/list")
+	console.HideWindow(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -61,5 +64,6 @@ func ListarPlanosEnergia(ctx context.Context) ([]PowerPlan, error) {
 // AtivarPlanoEnergia define o plano de energia ativo via powercfg /setactive.
 func AtivarPlanoEnergia(ctx context.Context, guid string) error {
 	cmd := exec.CommandContext(ctx, "powercfg", "/setactive", guid)
+	console.HideWindow(cmd)
 	return cmd.Run()
 }

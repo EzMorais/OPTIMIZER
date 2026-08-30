@@ -125,7 +125,12 @@ func (c *Collector) consolidateReport(report *BenchmarkReport, samples []MetricS
 	var cpuTemps []float64
 	var gpuTemps []float64
 
-	procMap := make(map[string]float64)
+	type processAggregate struct {
+		metric       ProcessMetric
+		totalPercent float64
+		samples      int
+	}
+	procMap := make(map[string]*processAggregate)
 
 	for _, s := range samples {
 		// CPU
@@ -176,7 +181,14 @@ func (c *Collector) consolidateReport(report *BenchmarkReport, samples []MetricS
 		// Processos CPU
 		for _, p := range s.TopProcessesCPU {
 			if p.Name != "" {
-				procMap[p.Name] += p.Percent
+				key := fmt.Sprintf("%d:%s", p.PID, p.Name)
+				agg := procMap[key]
+				if agg == nil {
+					agg = &processAggregate{metric: p}
+					procMap[key] = agg
+				}
+				agg.totalPercent += clampPercent(p.Percent)
+				agg.samples++
 			}
 		}
 		if s.TopProcessGPU != "" {
@@ -244,10 +256,15 @@ func (c *Collector) consolidateReport(report *BenchmarkReport, samples []MetricS
 	}
 
 	// Consolidação de processos
-	for name, val := range procMap {
+	for _, agg := range procMap {
+		if agg.samples == 0 {
+			continue
+		}
 		report.TopProcessesCPU = append(report.TopProcessesCPU, ProcessMetric{
-			Name:    name,
-			Percent: roundFloat(val/n, 1),
+			PID:     agg.metric.PID,
+			Name:    agg.metric.Name,
+			Memory:  agg.metric.Memory,
+			Percent: clampPercent(roundFloat(agg.totalPercent/float64(agg.samples), 1)),
 		})
 	}
 }

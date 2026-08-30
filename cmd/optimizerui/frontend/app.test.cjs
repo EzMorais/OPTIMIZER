@@ -42,7 +42,7 @@ test("carrega os perfis de rede no painel exibido pela interface", async () => {
 
   await ui.carregarPerfis();
 
-  assert.equal(painel.innerHTML, "");
+  assert.match(painel.innerHTML, /Nenhum perfil de rede disponível/);
 });
 
 test("mede a latencia usando o servidor de teste exibido na aba de rede", async () => {
@@ -86,10 +86,7 @@ test("conclui o diagnóstico mesmo sem os controles removidos de restauração e
         admin: false, caminhoHistorico: "C:/temp/history.jsonl", total: 1,
         aplicados: 0, recomendadosPendentes: 1, pendentesDesfazer: 0, itens: []
       }),
-      ResumoVisao: async () => ({
-        perfil: "pessoal", totalAjustes: 1, aplicados: 0,
-        recomendadosPendentes: 1, pendentesDesfazer: 0, coberturaPercentual: 0, categorias: []
-      })
+      ResumoVisao: async () => { throw new Error("não deve executar um segundo diagnóstico"); }
     };
     Visualizer.log = () => {};
   `, ui);
@@ -114,6 +111,31 @@ test("atualiza o contador da barra de ações que existe na interface", () => {
   assert.equal(elementos["#btn-aplicar"].disabled, false);
 });
 
+test("marca apenas recomendações aplicáveis na sessão atual", () => {
+  const elementos = {};
+  const controles = [
+    { dataset: { id: "usuario" }, disabled: false, checked: false },
+    { dataset: { id: "maquina" }, disabled: false, checked: false },
+  ];
+  const ui = carregarControlador(elementos, {
+    ".switch-control input[type=checkbox]": controles,
+    ".switch-control input:checked": [],
+  });
+  vm.runInContext(`
+    ultimoDiagnostico = { admin: false, itens: [
+      { id: "usuario", recomendado: true, precisaAdmin: false },
+      { id: "maquina", recomendado: true, precisaAdmin: true }
+    ] };
+    Visualizer.log = () => {};
+    toast = () => {};
+  `, ui);
+
+  ui.marcarRecomendados();
+
+  assert.equal(controles[0].checked, true);
+  assert.equal(controles[1].checked, false);
+});
+
 test("simula ajustes sem exigir controles de restauração que não estão na tela", async () => {
   let pontoDeRestauracao = true;
   const ui = carregarControlador({}, {
@@ -126,12 +148,76 @@ test("simula ajustes sem exigir controles de restauração que não estão na te
     Visualizer.log = () => {};
     mostrarResultados = () => {};
     toast = () => {};
+    carregarEstadoPerfis = async () => {};
+    diagnosticar = async () => {};
   `, ui);
   ui.pontoDeRestauracao = pontoDeRestauracao;
 
   await ui.aplicar(true);
 
   assert.equal(ui.pontoDeRestauracao, false);
+});
+
+test("aplica perfil de uso sem abrir benchmark obrigatório", async () => {
+  const ui = carregarControlador({ "#modal-corpo": { innerHTML: "" } });
+  vm.runInContext(`
+    listaPerfisUso = [{ key: "jogo", nome: "JOGO" }];
+    let aplicacaoPerfil = 0;
+    let benchmarkBase = 0;
+    App = {
+      AplicarPerfilUso: async () => { aplicacaoPerfil++; return [{ estado: "ok", nome: "Modo de jogo", mensagem: "Aplicado" }]; },
+      IniciarBenchmarkBase: async () => { benchmarkBase++; return { sampleCount: 60 }; },
+      ListarPerfisUso: async () => [],
+      ObterPerfilAtivo: async () => ""
+    };
+    Visualizer.show = () => {};
+    Visualizer.log = () => {};
+    mostrarResultados = () => {};
+    toast = () => {};
+  `, ui);
+
+  await ui.aplicarPerfilUso("jogo");
+
+  assert.equal(vm.runInContext("aplicacaoPerfil", ui), 1);
+  assert.equal(vm.runInContext("benchmarkBase", ui), 0);
+});
+
+test("não inicia dois diagnósticos concorrentes ao abrir ajustes", async () => {
+  const ui = carregarControlador({
+    "#lista": { innerHTML: "" },
+    "#resumo": { innerHTML: "" },
+    "#admin-area": { innerHTML: "" },
+    "#tab-badge-otim": { textContent: "" },
+    "#btn-desfazer-tudo": { disabled: false, innerHTML: "" },
+    "#btn-rever": { addEventListener: () => {} },
+  });
+  vm.runInContext(`
+    let diagnosticos = 0;
+    App = { Diagnosticar: async () => {
+      diagnosticos++;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return { perfil: "pessoal", admin: false, total: 51, aplicados: 0, itens: [] };
+    }};
+    Visualizer.log = () => {};
+    renderVisaoGeral = () => {};
+    atualizarLista = () => {};
+  `, ui);
+
+  await Promise.all([ui.diagnosticar(), ui.diagnosticar()]);
+
+  assert.equal(vm.runInContext("diagnosticos", ui), 1);
+});
+
+test("exibe item aplicado marcado e bloqueado", () => {
+  const ui = carregarControlador();
+  const html = vm.runInContext(`renderItem({
+    id: "visual.menu-show-delay", nome: "Abrir menus na hora", descricao: "", detalhe: "",
+    estado: "aplicado", recomendado: true, precisaAdmin: false, risco: "baixo"
+  })`, ui);
+
+  assert.match(html, /type="checkbox"[^>]*checked/);
+  assert.match(html, /type="checkbox"[^>]*disabled/);
+  assert.doesNotMatch(html, /Por que isso não vem marcado\?/);
 });
 
 test("verifica um perfil de uso com o formato real dos itens do diagnóstico", async () => {
@@ -219,6 +305,8 @@ test("aplica rapidamente os IPs do DNS escolhido no benchmark", async () => {
   vm.runInContext(`
     let ipsAplicados = [];
     App = { AplicarDNS: async (ips) => { ipsAplicados = ips; return { ok: true, mensagem: "DNS aplicado" }; } };
+    Visualizer.show = () => {};
+    Visualizer.log = () => {};
     toast = () => {};
   `, ui);
 
@@ -370,10 +458,13 @@ test("mede e sintoniza MTU sem fragmentacao de pacotes", async () => {
     App = {
       MedirMTU: async () => ({
         mtuAtual: 1500,
-        mtuOtimo: 1500,
-        interface: "Ethernet",
-        precisaFix: false,
-        mensagem: "Pacotes de 1500 bytes transitam sem fragmentação."
+        mtuCaminho: 1500,
+        adaptador: "Ethernet",
+        tipoAdaptador: "Ethernet",
+        resumo: "MTU adequado",
+        explicacao: "Pacotes transitam sem fragmentação.",
+        podeAplicar: false,
+        tentativas: []
       })
     };
     Visualizer.show = () => {};
@@ -381,9 +472,128 @@ test("mede e sintoniza MTU sem fragmentacao de pacotes", async () => {
   `, ui);
 
   await ui.medirMTU();
-  assert.match(elementos["#mtu-resultado"].innerHTML, /1500 bytes/);
-  assert.match(elementos["#mtu-resultado"].innerHTML, /Sem Fragmentação/);
+  assert.match(elementos["#mtu-resultado"].innerHTML, /MTU adequado/);
+  assert.match(elementos["#mtu-resultado"].innerHTML, /MTU medido no caminho: 1500/);
   assert.equal(elementos["#btn-medir-mtu"].disabled, false);
 });
 
+test("mantem uma unica implementacao do fluxo de medicao de MTU", () => {
+  const codigo = fs.readFileSync(path.join(__dirname, "dist", "app.js"), "utf8");
+  assert.equal((codigo.match(/async function medirMTU\(/g) || []).length, 1);
+});
+
+test("mostra erro quando o diagnóstico do sistema falha em vez de manter o spinner", async () => {
+  const elementos = {
+    "#lista": { innerHTML: "" },
+    "#resumo": { innerHTML: "" },
+    "#visao-geral": { innerHTML: "" },
+  };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`
+    App = { Diagnosticar: async () => { throw new Error("Registro indisponível"); } };
+    Visualizer.log = () => {};
+  `, ui);
+
+  await assert.doesNotReject(() => ui.diagnosticar());
+  assert.match(elementos["#visao-geral"].innerHTML, /indisponível/);
+  assert.match(elementos["#resumo"].innerHTML, /não foi possível concluir/i);
+});
+
+test("mantem uma unica implementacao dos fluxos publicos de DNS", () => {
+  const codigo = fs.readFileSync(path.join(__dirname, "dist", "app.js"), "utf8");
+  for (const nome of ["carregarDNSAtual", "testarDNS", "usarDNS"]) {
+    assert.equal((codigo.match(new RegExp(`function ${nome}\\(`, "g")) || []).length, 1, nome);
+  }
+});
+
+test("mantem os containers de Startup e Discos alinhados com o controlador", () => {
+  const html = fs.readFileSync(path.join(__dirname, "dist", "index.html"), "utf8");
+  const codigo = fs.readFileSync(path.join(__dirname, "dist", "app.js"), "utf8");
+
+  for (const id of ["lista-startup", "lista-drives"]) {
+    assert.match(html, new RegExp(`id=[\\"']${id}[\\"']`), `${id} ausente no HTML`);
+    assert.match(codigo, new RegExp(`\\$\\(\\\"#${id}\\\"\\)`), `${id} ausente no controlador`);
+  }
+  assert.match(codigo, /carregarStartup\(\)/, "Startup não entra no preload");
+  assert.match(codigo, /carregarDiscos\(\)/, "Discos não entra no preload");
+});
+
+test("não rejeita quando Startup, Discos ou MTU não têm controles na tela", async () => {
+  const ui = carregarControlador();
+  vm.runInContext("App = { ListarInicializacao: async () => [], ListarDiscos: async () => [] };", ui);
+  await assert.doesNotReject(() => ui.carregarStartup());
+  await assert.doesNotReject(() => ui.carregarDiscos());
+  await assert.doesNotReject(() => ui.aplicarMTU());
+});
+
+test("mostra falha ao carregar perfis de rede sem rejeitar o evento da aba", async () => {
+  const elementos = { "#perfis-lista": { innerHTML: "" } };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`App = { ListarPerfisRede: async () => { throw new Error("rede indisponível"); } };`, ui);
+
+  await assert.doesNotReject(() => ui.carregarPerfis());
+  assert.match(elementos["#perfis-lista"].innerHTML, /rede indisponível/);
+});
+
+test("sinaliza telemetria indisponível quando o binding falha", async () => {
+  const elementos = { "#telemetria-live-badge": { textContent: "SISTEMA ATIVO", style: {} } };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`App = { ObterTelemetriaAoVivo: async () => { throw new Error("coletor indisponível"); } };`, ui);
+
+  await assert.doesNotReject(() => ui.atualizarTelemetriaAoVivo());
+  assert.equal(elementos["#telemetria-live-badge"].textContent, "TELEMETRIA INDISPONÍVEL");
+});
+
+test("sinaliza telemetria indisponível quando o backend retorna erro estruturado", async () => {
+  const elementos = { "#telemetria-live-badge": { textContent: "SISTEMA ATIVO", style: {} } };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`App = { ObterTelemetriaAoVivo: async () => ({ erro: "PowerShell indisponível" }) };`, ui);
+
+  await assert.doesNotReject(() => ui.atualizarTelemetriaAoVivo());
+  assert.equal(elementos["#telemetria-live-badge"].textContent, "TELEMETRIA INDISPONÍVEL");
+});
+
+test("carrega e renderiza resolução do timer do kernel", async () => {
+  const elementos = {
+    "#timerres-container": { innerHTML: "" },
+    "#btn-timerres-05": { addEventListener: () => {} },
+    "#btn-timerres-default": { addEventListener: () => {} },
+    "#btn-testar-sleep-precision": { addEventListener: () => {} }
+  };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`App = { ObterTimerResolution: async () => ({ currentResolutionMs: 0.5, minResolutionMs: 15.625, maxResolutionMs: 0.5, isHighPrecision: true }) };`, ui);
+
+  await assert.doesNotReject(() => ui.carregarTimerResolution());
+  assert.match(elementos["#timerres-container"].innerHTML, /0.500 ms/);
+  assert.match(elementos["#timerres-container"].innerHTML, /Alta Precisão/);
+});
+
+test("executa benchmark de sleep e exibe cálculo de jitter", async () => {
+  const elementos = {
+    "#btn-testar-sleep-precision": { disabled: false, innerHTML: "" },
+    "#sleep-badge-score": { textContent: "" },
+    "#sleep-precision-resultado": { innerHTML: "" }
+  };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`App = { MedirSleepPrecision: async () => ({ targetMs: 1.0, averageMs: 1.002, minMs: 0.998, maxMs: 1.005, stdDevMs: 0.002, jitterScore: "Excelente (Ultra Baixo Jitter)", samples: [1.001, 1.002] }) };`, ui);
+
+  await assert.doesNotReject(() => ui.testarPrecisaoSleep());
+  assert.equal(elementos["#sleep-badge-score"].textContent, "Excelente (Ultra Baixo Jitter)");
+  assert.match(elementos["#sleep-precision-resultado"].innerHTML, /0.002 ms/);
+});
+
+test("escaneia e lista adaptadores PCIe com status MSI", async () => {
+  const elementos = {
+    "#btn-escanear-msi": { disabled: false, innerHTML: "" },
+    "#msi-resultado": { innerHTML: "" }
+  };
+  const ui = carregarControlador(elementos);
+  vm.runInContext(`App = { ListarDispositivosMSI: async () => [
+    { id: "PCI\\\\VEN_10DE", nome: "NVIDIA GeForce RTX 4080", classe: "Display", caminhoRegistro: "HKLM\\\\PCI", msiSupported: true, statusRotulo: "MSI Mode Ativo" }
+  ] };`, ui);
+
+  await assert.doesNotReject(() => ui.escanearDispositivosMSI());
+  assert.match(elementos["#msi-resultado"].innerHTML, /NVIDIA GeForce RTX 4080/);
+  assert.match(elementos["#msi-resultado"].innerHTML, /MSI Mode Ativo/);
+});
 

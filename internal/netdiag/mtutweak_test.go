@@ -70,6 +70,9 @@ func TestAplicarEDesfazerMTU(t *testing.T) {
 	if ctl.valor != 1500 {
 		t.Fatalf("MTU depois do revert = %d, queria 1500", ctl.valor)
 	}
+	if _, ok := res.Snapshot["mtu.destino"]; !ok {
+		t.Fatal("snapshot não preservou o MTU de destino para reidratação após reinício")
+	}
 }
 
 func TestSimulacaoDeMTUNaoAlteraNada(t *testing.T) {

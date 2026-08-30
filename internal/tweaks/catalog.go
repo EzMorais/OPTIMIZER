@@ -91,6 +91,9 @@ const (
 	pathDataCollection      = `SOFTWARE\Policies\Microsoft\Windows\DataCollection`
 	pathSystemPolicy        = `SOFTWARE\Policies\Microsoft\Windows\System`
 	pathInputSettings       = `Software\Microsoft\Input\Settings`
+	pathUsbXhci             = `SYSTEM\CurrentControlSet\Services\USBXHCI\Parameters`
+	pathWindowsNT           = `SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows`
+	pathNvidiaMsi           = `SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000\Interrupt Management\MessageSignaledInterruptProperties`
 )
 
 func entries() []entry {
@@ -1323,6 +1326,100 @@ func entries() []entry {
 				SortOrder:          250,
 			},
 		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "entrada.usb-xhci-interrupt-moderation",
+				DisplayName:    "Desativar moderação de interrupção USB XHCI (menor jitter em mouses 1000Hz+)",
+				Explanation:    "Desliga a moderação de interrupções no controlador USB XHCI, permitindo que eventos de movimento do mouse sejam entregues imediatamente à CPU sem espera em lote.",
+				Cat:            tweak.CategoryInput,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "A moderação de interrupções USB XHCI está desativada.",
+				NotAppliedText: "A moderação de interrupções USB XHCI está ativa no padrão do Windows.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathUsbXhci, "InterruptModeration", 0, 1),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: false,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Recomendado para mouses com polling rate de 1000Hz ou superior (até 8000Hz). Em CPUs muito antigas ou de 2 núcleos, pode gerar leve aumento de carga de interrupção.",
+				Evidence:           "docs/catalogo/registro.md#usb-xhci-imod",
+				SortOrder:          255,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "sistema.background-window-message-rate",
+				DisplayName:    "Otimizar taxa de mensagens para janelas em segundo plano (Windows 11)",
+				Explanation:    "Limita o processamento de mensagens DWM/Win32 para janelas fora de foco, liberando ciclos de CPU e reduzindo latência do jogo ou app em primeiro plano.",
+				Cat:            tweak.CategorySystem,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "A taxa de processamento de mensagens de fundo está otimizada.",
+				NotAppliedText: "As janelas de fundo recebem taxa irrestrita de mensagens do sistema.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathWindowsNT, "BackgroundWindowMessageRate", 1, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Reduz o consumo de CPU de abas e janelas minimizadas sem interromper downloads ou áudio de fundo.",
+				Evidence:           "docs/catalogo/registro.md#background-window-message-rate",
+				SortOrder:          260,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "jogos.gamedvr-fse-behavior",
+				DisplayName:    "Forçar modo de tela cheia exclusiva real para jogos (FSE Behavior)",
+				Explanation:    "Instrui o subsistema gráfico do Windows a honrar o modo Fullscreen Exclusive real, eliminando composição desnecessária e latência de sobreposição.",
+				Cat:            tweak.CategoryGaming,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   false,
+				AppliedText:    "O comportamento de tela cheia exclusiva real está ativado.",
+				NotAppliedText: "O Windows gerencia a tela cheia através de composição intermediária.",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKCU, pathGameConfig, "GameDVR_FSEBehaviorMode", 2, 0),
+				regtweak.DWord(winreg.HKCU, pathGameConfig, "GameDVR_HonorUserFSEBehaviorMode", 1, 0),
+				regtweak.DWord(winreg.HKCU, pathGameConfig, "GameDVR_FSEBehavior", 2, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfilePersonal,
+				RequiresAdmin:      false,
+				Caveat:             "Garante menor tempo de resposta e frame pacing estável em monitores com alta taxa de atualização.",
+				Evidence:           "docs/catalogo/registro.md#gamedvr-fse",
+				SortOrder:          265,
+			},
+		},
+		{
+			spec: regtweak.Spec{
+				TweakID:        "hardware.msi-mode-gpu",
+				DisplayName:    "Ativar interrupções por mensagem (MSI Mode) na GPU primária",
+				Explanation:    "Habilita Message Signaled Interrupts (MSI) para a GPU primária, eliminando compartilhamento de linha de IRQ e reduzindo tempo de execução DPC/ISR do driver.",
+				Cat:            tweak.CategoryGaming,
+				RiskLevel:      tweak.RiskLow,
+				NeedsRestart:   true,
+				AppliedText:    "O modo MSI de interrupção está ativado para a GPU primária.",
+				NotAppliedText: "A GPU opera sob interrupções clássicas baseadas em linha (Line-Based IRQ).",
+			},
+			values: []regtweak.Value{
+				regtweak.DWord(winreg.HKLM, pathNvidiaMsi, "MSISupported", 1, 0),
+			},
+			meta: tweak.Meta{
+				RecommendedDefault: true,
+				Profiles:           tweak.ProfileBoth,
+				RequiresAdmin:      true,
+				Caveat:             "Evita que a GPU dispute linhas de interrupção clássicas com outros periféricos PCIe ou USB.",
+				Evidence:           "docs/catalogo/hardware-energia-gpu.md#msi-mode",
+				SortOrder:          270,
+			},
+		},
 	}
 }
 
@@ -1330,4 +1427,3 @@ func withSatisfied(v regtweak.Value, f func(any) bool) regtweak.Value {
 	v.AlreadyOptimized = f
 	return v
 }
-

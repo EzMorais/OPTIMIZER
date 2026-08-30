@@ -149,10 +149,6 @@ func TestManifestoNaoRebaixaExigenciaDeAdministrador(t *testing.T) {
 	}
 }
 
-// TestPerfisDeRedeReferenciamTweaksExistentes garante que todo ID listado nos
-// perfis de internal/profiles corresponda a um tweak registry-backed real no
-// catálogo — um perfil apontando para um ID inexistente falharia silenciosamente
-// em produção (engine.Apply pula IDs desconhecidos sem erro fatal).
 func TestPerfisDeRedeReferenciamTweaksExistentes(t *testing.T) {
 	reg := tweaks.Build(winreg.NewFake())
 	for _, p := range profiles.List() {
@@ -160,6 +156,21 @@ func TestPerfisDeRedeReferenciamTweaksExistentes(t *testing.T) {
 			if _, ok := reg.Known(id); !ok {
 				t.Errorf("perfil %q referencia tweak %q, que não existe no catálogo registry-backed (pode ser um tweak WMI ainda não registrado — nesse caso, remover do perfil por enquanto)", p.Key, id)
 			}
+		}
+	}
+}
+
+func TestValleyofdoomTweaksPresent(t *testing.T) {
+	reg := tweaks.Build(winreg.NewFake())
+	expected := []string{
+		"entrada.usb-xhci-interrupt-moderation",
+		"sistema.background-window-message-rate",
+		"jogos.gamedvr-fse-behavior",
+		"hardware.msi-mode-gpu",
+	}
+	for _, id := range expected {
+		if _, ok := reg.Known(id); !ok {
+			t.Errorf("tweak de baixa latência esperado %q não está no catálogo", id)
 		}
 	}
 }

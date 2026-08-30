@@ -28,6 +28,7 @@ type MTUTweak struct {
 var _ tweak.Tweak = MTUTweak{}
 
 const mtuSnapshotKey = "mtu.anterior"
+const mtuTargetKey = "mtu.destino"
 
 // NewMTUTweak monta o ajuste a partir de um diagnóstico. Só faz sentido quando
 // o veredito pede mudança.
@@ -65,7 +66,7 @@ func (t MTUTweak) Check(ctx context.Context) (tweak.CheckResult, error) {
 	if err != nil {
 		return tweak.CheckResult{}, err
 	}
-	snap := tweak.Snapshot{mtuSnapshotKey: current}
+	snap := tweak.Snapshot{mtuSnapshotKey: current, mtuTargetKey: t.Target}
 	if current == t.Target {
 		return tweak.CheckResult{
 			State:       tweak.StateApplied,

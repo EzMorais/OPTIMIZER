@@ -99,8 +99,11 @@ func run(args []string) error {
 		return cmdPerfil(rest)
 	case "rede":
 		return cmdRede(rest)
+	case "timer-daemon":
+		return cmdTimerDaemon(rest)
+	default:
+		return fmt.Errorf("comando desconhecido %q — rode `optimizerctl ajuda`", cmd)
 	}
-	return fmt.Errorf("comando desconhecido %q — rode `optimizerctl ajuda`", cmd)
 }
 
 func addGlobals(fs *flag.FlagSet) *globals {

@@ -496,6 +496,33 @@
       <div id="mtu-resultado" style="margin-top:14px;"></div>
     </div>
 
+    <div class="glass-card" style="margin-top:16px;">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Editor seguro de MTU, MSS e rede</h2>
+          <p class="card-subtitle">Edite o MTU da interface ativa e selecione ajustes catalogados. O MSS é recalculado automaticamente.</p>
+        </div>
+        <button class="btn-secondary small-btn" id="btn-carregar-rede-config">Ler configuração atual</button>
+      </div>
+      <div class="network-editor-grid" style="margin-top:16px;">
+        <label>Adaptador<select id="rede-adaptador"><option value="">Carregando…</option></select></label>
+        <label>MTU IPv4<input id="rede-mtu" type="number" min="576" max="9000" step="1" value="1500"></label>
+        <label>MSS IPv4 (calculado)<input id="rede-mss4" type="number" readonly></label>
+        <label>MSS IPv6 (calculado)<input id="rede-mss6" type="number" readonly></label>
+      </div>
+      <div class="network-options" style="margin-top:14px;">
+        <label><input type="checkbox" class="rede-tweak" value="rede.network-throttling-off"> Remover limite de rede durante multimídia</label>
+        <label><input type="checkbox" class="rede-tweak" value="rede.tcp-timed-wait-delay"> Reduzir TIME_WAIT (uso intenso de conexões)</label>
+        <label><input type="checkbox" class="rede-tweak" value="rede.max-user-port"> Aumentar portas efêmeras disponíveis</label>
+        <label><input type="checkbox" class="rede-tweak" value="rede.sem-upload-de-atualizacoes"> Impedir upload de atualizações para outros PCs</label>
+      </div>
+      <div class="action-inline-form" style="margin-top:16px;">
+        <button class="btn-secondary" id="btn-validar-rede-config">Validar e simular</button>
+        <button class="btn-primary" id="btn-aplicar-rede-config">Aplicar configuração</button>
+      </div>
+      <div id="rede-config-resultado" style="margin-top:14px;"></div>
+    </div>
+
     <!-- Matriz de Ping para Servidores de Jogos (Multi-Region Matrix) -->
     <div class="glass-card" style="margin-top: 16px;">
       <div class="card-header">
@@ -574,7 +601,7 @@
         </div>
       </div>
 
-      <div class="startup-list-container" id="startup-container" style="margin-top:16px;">
+      <div class="startup-list-container" id="lista-startup" style="margin-top:16px;">
         <div class="health-loading"><span class="pulse-spinner"></span><span>Carregando programas de inicialização…</span></div>
       </div>
     </div>
@@ -608,7 +635,7 @@
         </div>
       </div>
 
-      <div class="disks-grid" id="disks-container" style="margin-top:16px;">
+      <div class="disks-grid" id="lista-drives" style="margin-top:16px;">
         <div class="health-loading"><span class="pulse-spinner"></span><span>Detectando discos e volumes…</span></div>
       </div>
     </div>
@@ -631,6 +658,46 @@
 
       <div id="pnp-resultado" style="margin-top:16px;">
         <p class="muted-text">Clique em "Buscar Dispositivos" para verificar se há periféricos desconectados no sistema.</p>
+      </div>
+    </div>
+
+    <!-- Kernel Timer Resolution & Benchmark de Sleep (valleyofdoom) -->
+    <div class="glass-card" style="margin-top: 16px;">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:rgba(16,185,129,0.15); color:#10b981;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Resolução do Temporizador do Kernel &amp; Jitter de Sleep</h2>
+          <p class="card-subtitle">Inspeção em tempo real da frequência de interrupção do relógio do Windows (NtQueryTimerResolution) e teste de precisão.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-atualizar-timerres">Atualizar</button>
+        </div>
+      </div>
+
+      <div id="timerres-container" style="margin-top:16px;">
+        <div class="health-loading"><span class="pulse-spinner"></span><span>Lendo resolução do temporizador do kernel…</span></div>
+      </div>
+    </div>
+
+    <!-- Inspetor de Interrupções de Hardware (Modo MSI vs IRQ Clássico) -->
+    <div class="glass-card" style="margin-top: 16px;">
+      <div class="card-header">
+        <div class="card-header-icon" style="background:rgba(59,130,246,0.15); color:#3b82f6;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <div>
+          <h2 class="card-title">Inspetor de Interrupções PCIe (Message Signaled Interrupts - MSI)</h2>
+          <p class="card-subtitle">Audita adaptadores de vídeo (GPU), rede e USB para eliminar compartilhamento de IRQ e reduzir picos DPC/ISR.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-secondary small-btn" id="btn-escanear-msi">Escanear Dispositivos</button>
+        </div>
+      </div>
+
+      <div id="msi-resultado" style="margin-top:16px;">
+        <p class="muted-text">Clique em "Escanear Dispositivos" para listar os adaptadores PCIe e seus modos de interrupção.</p>
       </div>
     </div>
 
@@ -660,6 +727,15 @@
       <h3 class="vis-title">Inspetor em Tempo Real</h3>
     </div>
     <div class="vis-header-actions">
+      <label class="vis-option" title="Mostrar os comandos equivalentes no terminal">
+        <input type="checkbox" id="chk-vis-commands" checked>
+        Comandos
+      </label>
+      <label class="vis-option" title="Rolar automaticamente para a operação mais recente">
+        <input type="checkbox" id="chk-vis-autoscroll" checked>
+        Auto-scroll
+      </label>
+      <button class="vis-icon-btn" id="vis-btn-copy" title="Copiar terminal">Copiar</button>
       <button class="vis-icon-btn" id="vis-btn-clear" title="Limpar terminal">&empty;</button>
       <button class="vis-icon-btn" id="vis-btn-close" title="Fechar painel (Esc)">&times;</button>
     </div>

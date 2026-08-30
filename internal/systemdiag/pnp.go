@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"optimizer/internal/console"
 )
 
 // PnpDevice representa um dispositivo Plug-and-Play no Windows.
@@ -27,11 +29,13 @@ type defaultPnpRunner struct{}
 
 func (r *defaultPnpRunner) ExecPowerShell(ctx context.Context, script string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
+	console.HideWindow(cmd)
 	return cmd.Output()
 }
 
 func (r *defaultPnpRunner) RemoveDevice(ctx context.Context, instanceID string) error {
 	cmd := exec.CommandContext(ctx, "pnputil.exe", "/remove-device", instanceID)
+	console.HideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("pnputil erro ao remover %s: %v (%s)", instanceID, err, strings.TrimSpace(string(out)))

@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"optimizer/internal/console"
 )
 
 // ProcessCPU representa um processo consumidor de CPU.
@@ -58,6 +60,7 @@ func (l *LiveProber) GetCPUInfo(ctx context.Context) (CPUInfo, error) {
 	// 1. Uso de CPU via PowerShell Get-Counter (amostra real de 1 segundo)
 	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
 		`$c = (Get-Counter '\Processor(_Total)\% Processor Time' -SampleInterval 1 -MaxSamples 1).CounterSamples[0].CookedValue; [math]::Round($c, 1)`)
+	console.HideWindow(cmd)
 	out, err := cmd.Output()
 	if err == nil {
 		strVal := strings.TrimSpace(string(out))
@@ -71,6 +74,7 @@ func (l *LiveProber) GetCPUInfo(ctx context.Context) (CPUInfo, error) {
 	// 2. Top processos mais consumidores via Get-Process
 	cmdProc := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
 		`Get-Process | Sort-Object CPU -Descending | Select-Object -First 5 Id, ProcessName, CPU | ForEach-Object { "$($_.Id)|$($_.ProcessName)|$([math]::Round($_.CPU, 1))" }`)
+	console.HideWindow(cmdProc)
 	outProc, errProc := cmdProc.Output()
 	if errProc == nil {
 		linhas := strings.Split(string(outProc), "\n")

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"optimizer/internal/console"
 )
 
 // ResultadoFlushRede resume a operação de limpeza e reset da pilha de rede.
@@ -35,6 +37,7 @@ func ExecutarFlushRede(ctx context.Context) ResultadoFlushRede {
 
 	for _, c := range comandos {
 		cmd := exec.CommandContext(ctx, c.args[0], c.args[1:]...)
+		console.HideWindow(cmd)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			// Alguns comandos podem precisar de permissões elevadas

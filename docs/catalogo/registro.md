@@ -163,6 +163,34 @@ Caminho base: `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\Syst
 - **Companheiro obrigatório**: `Get-SpeculationControlSettings` (script oficial da Microsoft, `Install-Module SpeculationControl` ou baixar de `https://aka.ms/SpeculationControlPS`) — somente leitura, mostra status real de cada mitigação. **Incluir sempre como botão "verificar status" ao lado de qualquer controle relacionado.**
 - **Fonte**: [KB4073119 — Windows client guidance for IT Pros](https://support.microsoft.com/en-us/topic/kb4073119-windows-client-guidance-for-it-pros-to-protect-against-silicon-based-microarchitectural-and-speculative-execution-side-channel-vulnerabilities-35820a8a-ae13-1299-88cc-357f104f5b11), [microsoft/SpeculationControl no GitHub](https://github.com/microsoft/SpeculationControl).
 
+## Interrupções USB e Jitter de Entrada
+
+### Moderação de Interrupções USB XHCI (`#usb-xhci-imod`)
+- **Chave**: `HKLM\SYSTEM\CurrentControlSet\Services\USBXHCI\Parameters`, valor `InterruptModeration`, REG_DWORD. Padrão = `1` (ativado). Otimizado: `0` (desativado).
+- **Ganho**: desativa a retenção em lote de interrupções no controlador host USB 3.0/3.1/3.2, despachando pacotes do mouse e teclado imediatamente para a fila ISR/DPC da CPU.
+- **Impacto**: Alto em mouses de alta taxa de atualização (1000Hz, 4000Hz, 8000Hz), reduzindo dispersão temporal e micro-stutters no tracking.
+- **Risco**: Baixo. Em CPUs com 2 núcleos muito antigas pode gerar leve aumento de carga de interrupções.
+- **Veredicto**: confirmado (respaldado por pesquisas e benchmarks do `valleyofdoom/PC-Tuning` §11.39).
+
+## Agendamento de Janelas e Mensagens Win11
+
+### BackgroundWindowMessageRate (`#background-window-message-rate`)
+- **Chave**: `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows`, valor `BackgroundWindowMessageRate`, REG_DWORD. Padrão = ausente / `0`. Otimizado: `1`.
+- **Ganho**: limita a taxa de despachos de mensagens de janela não prioritárias para processos fora de foco, liberando o thread de renderização em primeiro plano.
+- **Impacto**: Médio em multitarefa com jogos e compiladores.
+- **Risco**: Baixo. Não bloqueia downloads de background nem reprodução de áudio.
+- **Veredicto**: confirmado no Windows 11 22H2+ (`valleyofdoom/PC-Tuning` §11.52).
+
+## Subsistema Gráfico e Tela Cheia Real
+
+### Comportamento Fullscreen Exclusive FSE (`#gamedvr-fse`)
+- **Chave**: `HKCU\System\GameConfigStore`, valores `GameDVR_FSEBehaviorMode` (`2`), `GameDVR_HonorUserFSEBehaviorMode` (`1`), `GameDVR_FSEBehavior` (`2`), REG_DWORD.
+- **Ganho**: impede a injeção do wrapper DWM de sobreposição quando um aplicativo DirectX solicita modo de tela cheia exclusivo, reduzindo latência de apresentação e eliminando descompassos de frame timing.
+- **Impacto**: Alto em jogos competitivos.
+- **Risco**: Baixo.
+- **Veredicto**: confirmado (`valleyofdoom/PC-Tuning` §11.41 / §11.42).
+
+
 ---
 
 ## Regras para a UI (derivadas deste domínio)

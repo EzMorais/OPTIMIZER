@@ -13,8 +13,16 @@ let ultimoDiagnostico = null;
 let filtroTexto = "";
 let filtroCategoria = "todas";
 let filtroStatus = "todos";
+let dadosPrecarregados = false;
+let diagnosticoEmAndamento = null;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const comTimeout = (promessa, ms = 10000) => {
+  let timer;
+  return Promise.race([promessa, new Promise((_, rejeitar) => {
+    timer = setTimeout(() => rejeitar(new Error("A leitura demorou mais que o esperado.")), ms);
+  })]).finally(() => clearTimeout(timer));
+};
 
 /* ==========================================================================
    Motor do Visualizador de Operações & Telemetria em Tempo Real
@@ -22,6 +30,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const Visualizer = {
   events: [],
+  autoOpen: false,
   reads: 0,
   writes: 0,
   snaps: 0,
@@ -37,8 +46,14 @@ const Visualizer = {
     const btnClear = $("#vis-btn-clear") || $("#btn-vis-limpar");
     if (btnClear) btnClear.addEventListener("click", () => this.clear());
 
-    const btnCopy = $("#vis-btn-copiar") || $("#btn-vis-copiar");
+    const btnCopy = $("#vis-btn-copy") || $("#vis-btn-copiar") || $("#btn-vis-copiar");
     if (btnCopy) btnCopy.addEventListener("click", () => this.copy());
+
+    const commandToggle = $("#chk-vis-commands");
+    if (commandToggle) commandToggle.addEventListener("change", () => {
+      const drawer = $("#visualizer-drawer");
+      if (drawer) drawer.classList.toggle("commands-hidden", !commandToggle.checked);
+    });
 
     $$(".vis-tab").forEach((btn) => btn.addEventListener("click", () => {
       $$(".vis-tab").forEach((x) => x.classList.toggle("on", x === btn));
@@ -51,7 +66,7 @@ const Visualizer = {
 
   show() {
     const el = $("#visualizer-drawer");
-    if (el) el.hidden = false;
+    if (el && this.autoOpen) el.hidden = false;
   },
 
   hide() {
@@ -70,20 +85,22 @@ const Visualizer = {
     this.writes = 0;
     this.snaps = 0;
     this.durations = [];
-    $("#vis-stream-log").innerHTML = '<div class="vis-log-empty">Logs limpos. Aguardando novas operações de sistema…</div>';
-    $("#vis-diff-container").innerHTML = '<div class="vis-log-empty">Nenhum diff ativo no momento.</div>';
+    const log = $("#vis-stream-log");
+    if (log) log.innerHTML = '<div class="vis-log-empty">Logs limpos. Aguardando novas operações de sistema…</div>';
+    const diff = $("#vis-diff-container");
+    if (diff) diff.innerHTML = '<div class="vis-log-empty">Nenhum diff ativo no momento.</div>';
     this.updateStats();
   },
 
   updateStats() {
-    $("#stat-reads").textContent = this.reads;
-    $("#stat-writes").textContent = this.writes;
-    $("#stat-snaps").textContent = this.snaps;
+    const elReads = $("#stat-reads"); if (elReads) elReads.textContent = this.reads;
+    const elWrites = $("#stat-writes"); if (elWrites) elWrites.textContent = this.writes;
+    const elSnaps = $("#stat-snaps"); if (elSnaps) elSnaps.textContent = this.snaps;
     const avg = this.durations.length
       ? (this.durations.reduce((a, b) => a + b, 0) / this.durations.length).toFixed(2)
       : "0.2";
-    $("#stat-avgtime").textContent = `${avg} ms`;
-    $("#vis-event-count").textContent = `${this.events.length} ops`;
+    const elAvg = $("#stat-avgtime"); if (elAvg) elAvg.textContent = `${avg} ms`;
+    const elCount = $("#vis-event-count"); if (elCount) elCount.textContent = `${this.events.length} ops`;
   },
 
   log(op) {
@@ -131,6 +148,17 @@ const Visualizer = {
     } else {
       detailsHTML = `<span>${esc(op.msg || "")}</span>`;
     }
+    if (op.command || op.output || op.error) {
+      const command = op.command ? `COMANDO: ${op.command}` : "";
+      const output = op.output ? `SAÍDA: ${op.output}` : "";
+      const error = op.error ? `ERRO: ${op.error}` : "";
+      detailsHTML += `<span class="vis-command-detail">${esc([command, output, error].filter(Boolean).join("\n"))}</span>`;
+    }
+
+    if (typeof document === "undefined" || typeof document.createElement !== "function") {
+      this.updateStats();
+      return;
+    }
 
     const row = document.createElement("div");
     row.className = "vis-stream-row";
@@ -141,6 +169,7 @@ const Visualizer = {
     `;
 
     const logContainer = $("#vis-stream-log");
+    if (!logContainer) return;
     const emptyNotice = logContainer.querySelector(".vis-log-empty");
     if (emptyNotice) emptyNotice.remove();
 
@@ -153,7 +182,7 @@ const Visualizer = {
 
     logContainer.appendChild(row);
 
-    if ($("#chk-vis-autoscroll").checked) {
+    if ($("#chk-vis-autoscroll")?.checked) {
       logContainer.scrollTop = logContainer.scrollHeight;
     }
 
@@ -196,7 +225,8 @@ const Visualizer = {
       `[${e.time}] [${e.type.toUpperCase()}] ${e.hive ? e.hive + '\\' + e.path + (e.valName ? '!' + e.valName : '') : ''} ${e.oldVal !== undefined ? e.oldVal + ' -> ' : ''}${e.newVal !== undefined ? e.newVal : ''} ${e.msg || ''}`
     ).join("\n");
     navigator.clipboard.writeText(text);
-    const btn = $("#btn-vis-copiar");
+    const btn = $("#vis-btn-copy") || $("#vis-btn-copiar") || $("#btn-vis-copiar");
+    if (!btn) return;
     btn.textContent = "Copiado!";
     setTimeout(() => {
       btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar`;
@@ -241,6 +271,17 @@ function atualizarProgressoSplash(atual, total, statusText, detalheText) {
   if (detail && detalheText) detail.textContent = detalheText;
 }
 
+function animarSplashDuranteBoot(duracaoMs) {
+  const inicio = Date.now();
+  return setInterval(() => {
+    const progresso = Math.min(100, ((Date.now() - inicio) / duracaoMs) * 100);
+    const fill = $("#splash-progress-fill");
+    if (fill) fill.style.width = `${Math.max(5, progresso)}%`;
+    const counter = $("#splash-status-counter");
+    if (counter) counter.textContent = `[ ${Math.round(progresso * 51 / 100)} / 51 ]`;
+  }, 40);
+}
+
 function fecharSplash() {
   const splash = $("#app-splash-screen");
   if (splash) {
@@ -264,6 +305,9 @@ async function aguardarApp() {
 
 async function boot() {
   abrirSplash();
+  const inicioLoading = Date.now();
+  const splashAnimationTimer = animarSplashDuranteBoot(2000);
+  const staticLoadingWatchdog = setTimeout(encerrarLoadingsPendentes, 20000);
 
   const fallbackTimeout = setTimeout(() => {
     fecharSplash();
@@ -276,6 +320,13 @@ async function boot() {
     Visualizer.init();
     ligarEventos();
 
+    // O carregamento dos dados da interface não pode depender do diagnóstico
+    // completo. O diagnóstico pode demorar em máquinas com WMI/PowerShell
+    // lento; iniciar os módulos aqui evita que o HTML permaneça no spinner.
+    const preloadPromise = precarregarDadosApp().catch((err) => {
+      console.error("Erro ao carregar módulos estáticos:", err);
+    });
+
     atualizarProgressoSplash(18, 51, "Examinando subsistemas de CPU e GPU…", "Prioridade MMCSS e agendamento GPU");
     await sleep(150);
 
@@ -285,8 +336,8 @@ async function boot() {
     }
     await sleep(150);
 
-    atualizarProgressoSplash(48, 51, "Carregando telemetria e rede de baixa latência…", "Sintonia de buffers TCP & MTU");
-    await carregarEstadoPerfis();
+    atualizarProgressoSplash(48, 51, "Carregando dados dos módulos…", "Preparando rede, discos, inicialização e histórico");
+    await preloadPromise;
     atualizarTelemetriaAoVivo();
     await sleep(150);
 
@@ -296,8 +347,53 @@ async function boot() {
     console.error("Erro durante inicialização:", err);
   } finally {
     clearTimeout(fallbackTimeout);
+    clearTimeout(staticLoadingWatchdog);
+    clearInterval(splashAnimationTimer);
+    atualizarProgressoSplash(51, 51, "Inicialização concluída com sucesso!", "Optimizer 2.0 pronto");
+    await sleep(Math.max(0, 2000 - (Date.now() - inicioLoading)));
     fecharSplash();
   }
+}
+
+function encerrarLoadingsPendentes() {
+  const dns = $("#dns-atual");
+  if (dns && dns.textContent.includes("Lendo o DNS")) {
+    dns.innerHTML = '<div><span class="dns-current-label">DNS Atual</span><span>Não foi possível concluir a leitura automática.</span></div><button class="btn-secondary small-btn" id="btn-atualizar-dns">Tentar novamente</button>';
+    $("#btn-atualizar-dns")?.addEventListener("click", carregarDNSAtual);
+  }
+  const startup = $("#lista-startup");
+  if (startup && startup.textContent.includes("Lendo programas")) {
+    startup.innerHTML = '<div class="empty-results"><p>A leitura da inicialização demorou mais que o esperado.</p><button class="btn-secondary" id="btn-recarregar-startup-now">Tentar novamente</button></div>';
+    $("#btn-recarregar-startup-now")?.addEventListener("click", carregarStartup);
+  }
+  const drives = $("#lista-drives");
+  if (drives && drives.textContent.includes("Auditando unidades")) {
+    drives.innerHTML = '<div class="empty-results"><p>A leitura dos discos demorou mais que o esperado.</p><button class="btn-secondary" id="btn-recarregar-discos-now">Tentar novamente</button></div>';
+    $("#btn-recarregar-discos-now")?.addEventListener("click", carregarDiscos);
+  }
+  const adapter = $("#rede-adaptador");
+  if (adapter && adapter.value === "Carregando…") {
+    adapter.innerHTML = '<option value="">Interface não identificada — tente novamente</option>';
+  }
+}
+
+// Todos os dados estáticos são lidos uma vez durante o loading. Trocar de aba
+// apenas revela o HTML já preenchido; novas leituras só ocorrem por ação
+// explícita do usuário (Atualizar, Medir ou Aplicar).
+async function precarregarDadosApp() {
+  const tarefas = [
+    carregarEstadoPerfis(),
+    carregarPerfis(),
+    carregarDNSAtual(),
+    carregarEditorRede(),
+    carregarHistorico(),
+    carregarStartup(),
+    carregarDiscos(),
+    carregarTimerResolution(),
+    atualizarGraficoPingAoVivo()
+  ];
+  await Promise.allSettled(tarefas);
+  dadosPrecarregados = true;
 }
 
 /* ==========================================================================
@@ -391,29 +487,14 @@ function ligarEventos() {
       telemetriaTimer = null;
     }
 
-    if (viewId === "perfis") {
-      try {
-        if (App && typeof App.ResumoVisao === "function") {
-          App.ResumoVisao(perfil).then(renderVisaoGeral).catch(() => {});
-        }
-      } catch (e) {}
-    }
+    // Dados de catálogo, histórico, inicialização, discos e rede já foram
+    // carregados no boot. Navegar não dispara novas consultas.
     if (viewId === "telemetria") {
       atualizarTelemetriaAoVivo();
       if (!telemetriaTimer) telemetriaTimer = setInterval(atualizarTelemetriaAoVivo, 1000);
     }
-    if (viewId === "diag") {
-      carregarStartup();
-      carregarDiscos();
-    }
     if (viewId === "otim" && deveDiagnosticarAoAbrirAjustes(ultimoDiagnostico)) {
       diagnosticar();
-    }
-    if (viewId === "hist") carregarHistorico();
-    if (viewId === "rede") {
-      carregarPerfis();
-      carregarDNSAtual();
-      atualizarGraficoPingAoVivo();
     }
   }));
 
@@ -462,11 +543,27 @@ function ligarEventos() {
   const btnMedirMTU = $("#btn-medir-mtu");
   if (btnMedirMTU) btnMedirMTU.addEventListener("click", medirMTU);
 
+  const btnLerRede = $("#btn-carregar-rede-config");
+  if (btnLerRede) btnLerRede.addEventListener("click", carregarEditorRede);
+  const mtuRede = $("#rede-mtu");
+  if (mtuRede) mtuRede.addEventListener("input", atualizarMSSRede);
+  const btnValidarRede = $("#btn-validar-rede-config");
+  if (btnValidarRede) btnValidarRede.addEventListener("click", () => aplicarEditorRede(true));
+  const btnAplicarRede = $("#btn-aplicar-rede-config");
+  if (btnAplicarRede) btnAplicarRede.addEventListener("click", () => aplicarEditorRede(false));
+
   const btnEscanearPnp = $("#btn-escanear-pnp");
   if (btnEscanearPnp) btnEscanearPnp.addEventListener("click", escanearDispositivosFantasmas);
 
   const btnLimparPnp = $("#btn-limpar-pnp");
   if (btnLimparPnp) btnLimparPnp.addEventListener("click", limparDispositivosFantasmas);
+
+  const btnAtualizarTimerRes = $("#btn-atualizar-timerres");
+  if (btnAtualizarTimerRes) btnAtualizarTimerRes.addEventListener("click", carregarTimerResolution);
+
+  const btnEscanearMsi = $("#btn-escanear-msi");
+  if (btnEscanearMsi) btnEscanearMsi.addEventListener("click", escanearDispositivosMSI);
+
 
   const btnBenchCancelar = $("#btn-bench-cancelar");
   if (btnBenchCancelar) btnBenchCancelar.addEventListener("click", fecharModalBenchmark);
@@ -553,9 +650,36 @@ function gerarVisaoGeralDeDiagnostico(d) {
   };
 }
 
+function mostrarFalhaDiagnostico(erro) {
+  const detalhe = erro ? `: ${esc(String(erro))}` : "";
+  const painel = $("#visao-geral");
+  if (painel) {
+    painel.innerHTML = `<div class="overview-unavailable"><span>Visão geral indisponível${detalhe}</span></div>`;
+  }
+  const resumo = $("#resumo");
+  if (resumo) {
+    resumo.innerHTML = `<div class="empty-results"><p>Não foi possível concluir o diagnóstico agora${detalhe}.</p><button class="btn-secondary" id="btn-rever-falha">Tentar novamente</button></div>`;
+    const btn = $("#btn-rever-falha");
+    if (btn) btn.addEventListener("click", () => diagnosticar());
+  }
+}
+
 async function diagnosticar(isBoot = false) {
+  if (diagnosticoEmAndamento) return diagnosticoEmAndamento;
+  diagnosticoEmAndamento = diagnosticarInterno(isBoot);
+  try {
+    return await diagnosticoEmAndamento;
+  } finally {
+    diagnosticoEmAndamento = null;
+  }
+}
+
+async function diagnosticarInterno(isBoot = false) {
   if (!App) await aguardarApp();
-  if (!App || typeof App.Diagnosticar !== "function") return;
+  if (!App || typeof App.Diagnosticar !== "function") {
+    mostrarFalhaDiagnostico("núcleo do app indisponível");
+    return;
+  }
 
   const totalEsperado = perfil === "trabalho" ? 37 : 51;
   const listaEl = $("#lista");
@@ -580,17 +704,19 @@ async function diagnosticar(isBoot = false) {
     msg: `Iniciando varredura e diagnóstico do catálogo para o perfil [${perfil}]`
   });
 
-  const d = await App.Diagnosticar(perfil);
+  let d;
+  try {
+    d = await App.Diagnosticar(perfil);
+  } catch (e) {
+    mostrarFalhaDiagnostico(e);
+    return;
+  }
   ultimoDiagnostico = d;
 
-  try {
-    const visao = (App && typeof App.ResumoVisao === "function") 
-      ? await App.ResumoVisao(perfil) 
-      : gerarVisaoGeralDeDiagnostico(d);
-    renderVisaoGeral(visao || gerarVisaoGeralDeDiagnostico(d));
-  } catch (e) {
-    renderVisaoGeral(gerarVisaoGeralDeDiagnostico(d));
-  }
+  // O diagnóstico já contém todos os dados necessários para a visão geral.
+  // Não chamar ResumoVisao aqui: esse binding executa outro Scan completo do
+  // Registro e pode deixar a tela presa aguardando uma segunda leitura.
+  renderVisaoGeral(gerarVisaoGeralDeDiagnostico(d));
 
   // Stream de eventos simulados da leitura de cada chave do registro
   if (d.itens && d.itens.length) {
@@ -603,6 +729,7 @@ async function diagnosticar(isBoot = false) {
         valName: it.id.split(".").pop(),
         newVal: it.estado === "aplicado" ? "1 (otimizado)" : "0 (padrão)",
         msg: `Status: [${it.estado}]`,
+        command: `reg query "${hive}\\${it.categoria || "Software"}" /v "${it.id}"`,
         status: it.estado
       });
     }
@@ -685,13 +812,8 @@ function renderVisaoGeral(visao) {
       <span class="overview-updated">Atualizado agora</span>
     </div>
     <div class="overview-layout">
-      <div class="coverage-chart-panel">
-        <div class="coverage-ring" style="--coverage:${percentualInteiro}" role="img" aria-label="${percentualInteiro}% dos ajustes do cat\u00e1logo aplicados">
-          <div class="coverage-ring-center">
-            <strong>${percentualInteiro}%</strong>
-            <span>Cobertura</span>
-          </div>
-        </div>
+      <div class="coverage-chart-panel" style="display:flex; align-items:center; gap:12px;">
+        <canvas id="canvas-donut-cobertura" style="width:96px; height:96px; flex-shrink:0; display:block;"></canvas>
         <div class="coverage-copy">
           <strong>${aplicados} de ${total}</strong>
           <span>ajustes aplicados</span>
@@ -733,6 +855,10 @@ function renderVisaoGeral(visao) {
         </div>
       </div>
     </div>`;
+
+  setTimeout(() => {
+    renderCatalogDonutChart("canvas-donut-cobertura", percentualInteiro, aplicados, total);
+  }, 50);
 }
 
 /* ==========================================================================
@@ -829,12 +955,12 @@ function riscoClassTag(r) {
 function renderItem(it) {
   const aplicado = it.estado === "aplicado";
   const rotulo = { aplicado: "Aplicado", nao_aplicado: "Não Aplicado", parcial: "Parcial", desconhecido: "Desconhecido" }[it.estado] || "Não Aplicado";
-  const marcar = !aplicado && it.recomendado && !it.precisaAdmin;
+  const marcar = !aplicado && it.recomendado && (!it.precisaAdmin || ultimoDiagnostico?.admin);
 
   return `
   <div class="tweak-card ${aplicado ? "applied" : ""}">
     <label class="switch-control" title="${aplicado ? "Este ajuste já está ativo" : "Marcar para aplicar"}">
-      <input type="checkbox" data-id="${esc(it.id)}" ${aplicado ? "disabled" : ""} ${marcar ? "checked" : ""}>
+      <input type="checkbox" data-id="${esc(it.id)}" ${aplicado ? "disabled checked" : ""} ${!aplicado && marcar ? "checked" : ""}>
       <span class="switch-track"></span>
     </label>
     <div class="tweak-info">
@@ -846,11 +972,12 @@ function renderItem(it) {
       </div>
       <div class="tweak-desc">${esc(it.descricao)}</div>
       <div class="tweak-detail">${esc(it.detalhe)}</div>
-      ${it.ressalva ? `
+      ${it.motivoRecomendacao ? `<div class="field-hint recommendation-reason">${esc(it.motivoRecomendacao)}</div>` : ""}
+      ${!aplicado && it.ressalva ? `
         <button class="link-expand">Por que isso não vem marcado?</button>
         <div class="caveat-box" hidden>
           <b>Ressalva honesta:</b> ${esc(it.ressalva)}
-          ${it.evidencia ? `<div class="caveat-evidence">Base técnica: ${esc(it.evidencia)}</div>` : ""}
+          ${(it.base || it.evidencia) ? `<div class="caveat-evidence">Base técnica: ${esc(it.base || it.evidencia)}</div>` : ""}
         </div>` : ""}
     </div>
     <span class="status-pill ${esc(it.estado)}">${esc(rotulo)}</span>
@@ -858,7 +985,11 @@ function renderItem(it) {
 }
 
 function marcarRecomendados() {
-  const rec = new Set((ultimoDiagnostico?.itens || []).filter((i) => i.recomendado).map((i) => i.id));
+  const itens = ultimoDiagnostico?.itens || [];
+  const rec = new Set(itens
+    .filter((i) => i.recomendado && (!i.precisaAdmin || ultimoDiagnostico?.admin))
+    .map((i) => i.id));
+  const bloqueados = itens.filter((i) => i.recomendado && i.precisaAdmin && !ultimoDiagnostico?.admin).length;
   $$('.switch-control input[type=checkbox]').forEach((c) => {
     if (!c.disabled) c.checked = rec.has(c.dataset.id);
   });
@@ -867,7 +998,13 @@ function marcarRecomendados() {
     type: "read",
     msg: `Itens recomendados marcados para aplicação em lote (${rec.size} itens)`
   });
-  toast("Itens recomendados selecionados.", "info", 2000);
+  toast(
+    bloqueados
+      ? `${rec.size} item(ns) selecionado(s). ${bloqueados} recomendação(ões) exigem “Reabrir como Admin”.`
+      : "Itens recomendados selecionados.",
+    "info",
+    3500
+  );
 }
 
 function selecionados() {
@@ -932,11 +1069,20 @@ async function aplicar(simular) {
 
     mostrarResultados(simular ? "Simulação de Otimização" : "Resultado da Aplicação", res);
     if (!simular) {
-      toast("Otimizações aplicadas com sucesso.", "ok");
+      const aplicados = (res || []).filter((r) => r.estado === "ok").length;
+      const falhas = (res || []).filter((r) => r.estado === "falhou").length;
+      const pulados = (res || []).filter((r) => r.estado === "pulado").length;
+      if (falhas || pulados || !aplicados) {
+        toast(`${aplicados} aplicado(s), ${pulados} pulado(s), ${falhas} falha(s). Veja os detalhes.`, falhas || pulados ? "erro" : "info", 4500);
+      } else {
+        toast("Otimizações aplicadas com sucesso.", "ok");
+      }
       await diagnosticar();
     } else {
       toast("Simulação concluída. Nenhuma chave do registro foi alterada.", "info");
     }
+  } catch (e) {
+    toast(`Falha na aplicação: ${String(e)}`, "erro");
   } finally {
     travar(false);
   }
@@ -967,13 +1113,15 @@ async function desfazerTudo() {
     toast("Configurações revertidas para o estado original.", "ok");
     await diagnosticar();
     if ($("#view-hist").classList.contains("on")) await carregarHistorico();
+  } catch (e) {
+    toast(`Falha ao desfazer configurações: ${String(e)}`, "erro");
   } finally {
     travar(false);
   }
 }
 
 function travar(travado) {
-  $$("#barra .dock-btn").forEach((b) => (b.disabled = travado));
+  $$("#barra button").forEach((b) => (b.disabled = travado));
 }
 
 function mostrarResultados(titulo, res) {
@@ -990,6 +1138,12 @@ function mostrarResultados(titulo, res) {
     </div>`;
   }).join("");
 
+  const bloqueadosAdmin = res.filter((r) => r.estado === "pulado" && /administrador/i.test(r.mensagem || ""));
+  const avisoAdmin = bloqueadosAdmin.length
+    ? `<div class="reboot-warn-box">
+        <span>⚠ ${bloqueadosAdmin.length} ajuste(s) não foram aplicados porque exigem administrador. Use “Reabrir como Admin” no topo e tente novamente.</span>
+       </div>`
+    : "";
   const avisoReiniciar = res.some((r) => r.precisaSair && r.estado === "ok")
     ? `<div class="reboot-warn-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -997,7 +1151,7 @@ function mostrarResultados(titulo, res) {
        </div>`
     : "";
 
-  abrirModal(titulo, linhas + avisoReiniciar);
+  abrirModal(titulo, linhas + avisoAdmin + avisoReiniciar);
 }
 
 async function elevar() {
@@ -1015,11 +1169,12 @@ async function elevar() {
    ========================================================================== */
 
 async function medirMTU() {
-  const dest = $("#destino").value.trim();
-  const btn = $("#btn-medir");
-  btn.disabled = true;
-  btn.innerHTML = `<span class="pulse-spinner"></span> Medindo…`;
-  $("#mtu-resultado").innerHTML = `
+  const dest = ($("#destino")?.value || "8.8.8.8").trim();
+  const btn = $("#btn-medir-mtu");
+  const container = $("#mtu-resultado");
+  if (btn) btn.disabled = true;
+  if (btn) btn.innerHTML = `<span class="pulse-spinner"></span> Medindo…`;
+  if (container) container.innerHTML = `
     <div class="glass-card" style="margin-top:14px">
       <div class="health-loading">
         <span class="pulse-spinner"></span>
@@ -1045,7 +1200,7 @@ async function medirMTU() {
       }
     }
 
-    $("#mtu-resultado").innerHTML = mtuHTML(m);
+    if (container) container.innerHTML = mtuHTML(m);
     const btnAplicarMTU = $("#btn-aplicar-mtu");
     if (btnAplicarMTU) btnAplicarMTU.addEventListener("click", aplicarMTU);
     
@@ -1062,9 +1217,13 @@ async function medirMTU() {
       tabela.hidden = !tabela.hidden;
       btnDet.textContent = tabela.hidden ? "Ver tentativas detalhadas" : "Esconder tentativas";
     });
+  } catch (e) {
+    if (container) container.innerHTML = `<div class="empty-results"><p>Erro ao medir MTU: ${esc(String(e))}</p></div>`;
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Medir MTU Ideal`;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Medir MTU Ideal`;
+    }
   }
 }
 
@@ -1119,6 +1278,7 @@ function mtuHTML(m) {
 
 async function aplicarMTU() {
   const btn = $("#btn-aplicar-mtu");
+  if (!btn) return;
   btn.disabled = true;
   Visualizer.log({ type: "write", msg: "Aplicando novo valor de MTU na interface de rede..." });
   try {
@@ -1126,6 +1286,8 @@ async function aplicarMTU() {
     mostrarResultados("Ajuste de MTU", res);
     toast("MTU ajustado com sucesso.", "ok");
     await medirMTU();
+  } catch (e) {
+    toast(`Não foi possível ajustar o MTU: ${String(e)}`, "erro");
   } finally {
     btn.disabled = false;
   }
@@ -1135,12 +1297,69 @@ async function aplicarMTU() {
    Perfis de Rede
    ========================================================================== */
 
+function atualizarMSSRede() {
+  const mtu = Number($("#rede-mtu")?.value || 0);
+  if ($("#rede-mss4")) $("#rede-mss4").value = mtu >= 576 ? mtu - 40 : "";
+  if ($("#rede-mss6")) $("#rede-mss6").value = mtu >= 576 ? mtu - 60 : "";
+}
+
+function lerConfigRedeUI() {
+  return { adaptador: $("#rede-adaptador")?.value || "", mtu: Number($("#rede-mtu")?.value || 0), mssIPv4: Number($("#rede-mss4")?.value || 0), mssIPv6: Number($("#rede-mss6")?.value || 0), idsOtimizacao: $$(".rede-tweak:checked").map((x) => x.value) };
+}
+
+async function carregarEditorRede() {
+  if (!App || typeof App.ObterConfiguracaoRede !== "function") return;
+  try {
+    const cfg = await comTimeout(App.ObterConfiguracaoRede());
+    if (!cfg?.adaptador) throw new Error("Não foi possível identificar a interface de saída.");
+    const select = $("#rede-adaptador");
+    if (select) select.innerHTML = `<option value="${esc(cfg.adaptador)}">${esc(cfg.adaptador)}</option>`;
+    $("#rede-mtu").value = cfg.mtu || 1500;
+    atualizarMSSRede();
+  } catch (err) { toast("Falha ao ler rede: " + (err.message || err), "erro"); }
+}
+
+async function aplicarEditorRede(simular) {
+  if (!App || typeof App.ValidarConfiguracaoRede !== "function") return;
+  const cfg = lerConfigRedeUI();
+  const result = $("#rede-config-resultado");
+  let valid;
+  try { valid = await App.ValidarConfiguracaoRede(cfg); }
+  catch (err) {
+    if (result) result.innerHTML = `<div class="error-box">${esc(String(err))}</div>`;
+    return;
+  }
+  if (!valid.valida) { if (result) result.innerHTML = `<div class="error-box">${esc(valid.mensagem)}</div>`; return; }
+  if (simular) {
+    if (result) result.innerHTML = `<div class="terminal-block"><p>${esc(valid.mensagem)}</p>${(valid.comandos || []).map((c) => `<div class="terminal-line"><span class="cmd-ok">${esc(c)}</span></div>`).join("")}</div>`;
+    Visualizer.log({ type: "net", msg: "Simulação de configuração de MTU/MSS", command: (valid.comandos || []).join("\n") });
+    return;
+  }
+  const btn = $("#btn-aplicar-rede-config");
+  if (btn) btn.disabled = true;
+  try {
+    const res = await App.AplicarConfiguracaoRede(cfg, false);
+    mostrarResultados("Otimização de rede", res);
+    const falhas = (res || []).filter((x) => x.estado === "falhou");
+    toast(falhas.length ? "A configuração terminou com falhas." : "Configuração de rede aplicada.", falhas.length ? "erro" : "ok");
+    await carregarEditorRede();
+  } catch (err) { toast("Falha ao aplicar rede: " + (err.message || err), "erro"); }
+  finally { if (btn) btn.disabled = false; }
+}
+
 async function carregarPerfis() {
   const container = $("#perfis-lista");
+  if (!container) return;
   container.innerHTML = '<p class="muted-text">Carregando perfis de rede…</p>';
-  const perfis = await App.ListarPerfisRede();
-  container.innerHTML = (perfis || []).map(renderPerfilCard).join("");
-  $$(".btn-aplicar-perfil").forEach((b) => b.addEventListener("click", () => aplicarPerfil(b.dataset.key)));
+  try {
+    const perfis = await comTimeout(App.ListarPerfisRede());
+    container.innerHTML = (perfis || []).map(renderPerfilCard).join("") || '<p class="muted-text">Nenhum perfil de rede disponível.</p>';
+    $$(".btn-aplicar-perfil").forEach((b) => b.addEventListener("click", () => aplicarPerfil(b.dataset.key)));
+  } catch (e) {
+    container.innerHTML = `<div class="empty-results"><p>Erro ao carregar perfis de rede: ${esc(String(e))}</p><button class="btn-secondary" id="btn-recarregar-perfis">Tentar novamente</button></div>`;
+    const retry = $("#btn-recarregar-perfis");
+    if (retry) retry.addEventListener("click", carregarPerfis);
+  }
 }
 
 function renderPerfilCard(p) {
@@ -1169,67 +1388,10 @@ async function aplicarPerfil(key) {
     const res = await App.AplicarPerfilRede(key, false);
     mostrarResultados("Perfil de Rede Aplicado", res);
     toast("Perfil de rede aplicado com sucesso.", "ok");
+  } catch (e) {
+    toast(`Falha ao aplicar perfil de rede: ${String(e)}`, "erro");
   } finally {
     btns.forEach((b) => (b.disabled = false));
-  }
-}
-
-/* ==========================================================================
-   Sintonia de MTU
-   ========================================================================== */
-
-async function medirMTU() {
-  const btn = $("#btn-medir-mtu");
-  const container = $("#mtu-resultado");
-  if (btn) btn.disabled = true;
-  if (container) {
-    container.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Identificando tamanho máximo de pacote (MTU) sem fragmentação…</span></div>';
-  }
-
-  Visualizer.show();
-  Visualizer.log({ type: "net", msg: "Iniciando detecção de MTU ótimo por sondagem binária ICMP com DF..." });
-
-  try {
-    const host = ($("#destino")?.value || "8.8.8.8").trim();
-    const res = await App.MedirMTU(host);
-    if (res.erro) {
-      if (container) container.innerHTML = `<p class="danger-text">Erro ao medir MTU: ${esc(res.erro)}</p>`;
-      return;
-    }
-
-    if (container) {
-      container.innerHTML = `
-        <div style="background:var(--bg-sunken); padding:14px; border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <div>
-              <div style="font-size:0.9rem; color:var(--text-secondary);">Interface Ativa: <b>${esc(res.interface || 'Ethernet')}</b></div>
-              <div style="margin-top:4px;">MTU Atual: <b class="mono" style="font-size:1.1rem;">${res.mtuAtual || 1500} bytes</b> · MTU Ótimo Recomendado: <b class="mono" style="color:var(--accent); font-size:1.2rem;">${res.mtuOtimo || 1500} bytes</b></div>
-            </div>
-            ${res.precisaFix ? `
-              <button class="btn-primary small-btn" id="btn-aplicar-mtu-fix">Corrigir MTU</button>
-            ` : `
-              <span class="badge-tag rec" style="background:rgba(16,185,129,0.15); color:#10b981; padding:4px 8px; font-weight:700;">[MTU Ótimo / Sem Fragmentação]</span>
-            `}
-          </div>
-          <p class="field-hint" style="margin-top:8px;">${esc(res.mensagem || 'Pacotes transitam sem fragmentação na rota.')}</p>
-        </div>
-      `;
-
-      const btnFix = $("#btn-aplicar-mtu-fix");
-      if (btnFix) {
-        btnFix.addEventListener("click", async () => {
-          btnFix.disabled = true;
-          toast(`Ajustando MTU para ${res.mtuOtimo} bytes…`, "info");
-          const r = await App.AplicarMTU(res.mtuOtimo);
-          toast(r.mensagem, r.ok ? "ok" : "err");
-          await medirMTU();
-        });
-      }
-    }
-  } catch (e) {
-    if (container) container.innerHTML = `<p class="danger-text">Erro: ${esc(String(e))}</p>`;
-  } finally {
-    if (btn) btn.disabled = false;
   }
 }
 
@@ -1386,7 +1548,7 @@ async function carregarDNSAtual() {
   if (!container) return;
 
   try {
-    const atual = await App.ObterDNSAtual();
+    const atual = await comTimeout(App.ObterDNSAtual());
     if (!atual || atual.erro) {
       container.innerHTML = `
         <div>
@@ -1432,7 +1594,11 @@ async function testarDNS() {
 
     if (container) {
       container.innerHTML = `
-        <div class="data-table-wrap" style="max-height: 420px; overflow-y: auto;">
+        <div style="margin-bottom: 12px;">
+          <h4 style="font-size:13px; font-weight:700; margin:0 0 6px 0;">Comparativo Visual de Latência DNS (Menor = Mais Rápido)</h4>
+          <canvas id="canvas-dns-benchmark" style="width:100%; height:140px; display:block; background:#0c131d; border-radius:8px; border:1px solid rgba(255,255,255,0.06);"></canvas>
+        </div>
+        <div class="data-table-wrap" style="max-height: 380px; overflow-y: auto;">
           <table class="data-table">
             <thead>
               <tr>
@@ -1480,6 +1646,10 @@ async function testarDNS() {
           </table>
         </div>
       `;
+
+      setTimeout(() => {
+        renderDNSBenchmarkChart("canvas-dns-benchmark", provedores);
+      }, 50);
 
       $$(".btn-usar-dns").forEach((b) => b.addEventListener("click", async () => {
         try {
@@ -1615,7 +1785,9 @@ async function executarFlushRede() {
 
 async function carregarHistorico() {
   const container = $("#hist-lista");
-  const entradas = await App.Historico();
+  if (!container) return;
+  try {
+  const entradas = await comTimeout(App.Historico());
   if (!entradas || !entradas.length) {
     container.innerHTML = '<div class="empty-results"><p>Nenhuma alteração foi realizada até o momento nesta máquina.</p></div>';
     return;
@@ -1634,6 +1806,9 @@ async function carregarHistorico() {
       <div><b>${esc(e.item)}</b> — <span class="card-subtitle">${esc(e.resultado)}</span></div>
     </div>`;
   }).join("");
+  } catch (e) {
+    container.innerHTML = `<div class="empty-results"><p>Erro ao ler histórico: ${esc(String(e))}</p></div>`;
+  }
 }
 
 /* ==========================================================================
@@ -1642,9 +1817,10 @@ async function carregarHistorico() {
 
 async function carregarStartup() {
   const container = $("#lista-startup");
+  if (!container) return;
   container.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Lendo programas de inicialização…</span></div>';
   try {
-    const itens = await App.ListarInicializacao();
+    const itens = await comTimeout(App.ListarInicializacao());
     if (!itens || !itens.length) {
       container.innerHTML = '<div class="empty-results"><p>Nenhum programa configurado para inicializar automaticamente com o Windows.</p></div>';
       return;
@@ -1674,7 +1850,9 @@ async function carregarStartup() {
         type: "write",
         msg: `${ativar ? "Ativando" : "Desativando"} programa na inicialização: [${id}]`
       });
-      const err = await App.AlternarInicializacao(id, ativar);
+      let err;
+      try { err = await App.AlternarInicializacao(id, ativar); }
+      catch (cause) { err = String(cause); }
       if (err) {
         toast(`Erro ao alterar: ${err}`, "erro");
         e.target.checked = !ativar;
@@ -1693,28 +1871,39 @@ async function carregarStartup() {
 
 async function carregarDiscos() {
   const container = $("#lista-drives");
+  if (!container) return;
   container.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Auditando unidades de disco…</span></div>';
   try {
-    const drives = await App.ListarDiscos();
+    const drives = await comTimeout(App.ListarDiscos());
     if (!drives || !drives.length) {
       container.innerHTML = '<div class="empty-results"><p>Nenhuma unidade detectada.</p></div>';
       return;
     }
 
-    container.innerHTML = drives.map((d) => `
-      <div class="glass-card" style="margin-bottom:12px; border-left:3px solid var(--accent);">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <h3 class="card-title" style="margin:0;">Unidade ${esc(d.letter)} (${esc(d.label)})</h3>
-            <p class="field-hint" style="margin-top:4px;">Tipo de Mídia: <b>${esc(d.mediaType)}</b> (${esc(d.busType)}) · Saúde SMART: <b>${esc(d.healthStatus)}</b></p>
-          </div>
-          <div style="display:flex; gap:8px;">
-            ${d.supportsTrim ? `<button class="btn-secondary small-btn btn-trim" data-drive="${esc(d.letter)}">Executar TRIM</button>` : ""}
-            <button class="btn-secondary small-btn btn-chkdsk" data-drive="${esc(d.letter)}">chkdsk /scan</button>
+    container.innerHTML = drives.map((d) => {
+      const isSSD = String(d.mediaType || "").toUpperCase().includes("SSD") || String(d.busType || "").toUpperCase().includes("NVME");
+      return `
+        <div class="glass-card" style="margin-bottom:12px; border-left:3px solid ${isSSD ? 'var(--accent)' : 'var(--warn)'};">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="flex:1;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <h3 class="card-title" style="margin:0;">Unidade ${esc(d.letter)} (${esc(d.label || 'Volume Local')})</h3>
+                <span class="badge-tag ${isSSD ? 'rec' : 'obs'}">${esc(d.mediaType || 'Disco')}</span>
+                <span class="badge-tag rec">${esc(d.busType || 'SATA/NVMe')}</span>
+              </div>
+              <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:999px; overflow:hidden; margin-top:8px; max-width:320px;">
+                <div style="width:100%; height:100%; background:linear-gradient(90deg, #10b981, #00f0ff); border-radius:999px;"></div>
+              </div>
+              <p class="field-hint" style="margin-top:6px;">Saúde SMART: <b>${esc(d.healthStatus || 'Saudável')}</b> · TRIM: <b>${d.supportsTrim ? 'Suportado' : 'N/A'}</b></p>
+            </div>
+            <div style="display:flex; gap:8px;">
+              ${d.supportsTrim ? `<button class="btn-secondary small-btn btn-trim" data-drive="${esc(d.letter)}">Executar TRIM</button>` : ""}
+              <button class="btn-secondary small-btn btn-chkdsk" data-drive="${esc(d.letter)}">chkdsk /scan</button>
+            </div>
           </div>
         </div>
-      </div>
-    `).join("");
+      `;
+    }).join("");
 
     $$(".btn-trim").forEach((btn) => btn.addEventListener("click", async () => {
       const drv = btn.dataset.drive;
@@ -1722,9 +1911,10 @@ async function carregarDiscos() {
       btn.textContent = "Executando TRIM…";
       Visualizer.show();
       Visualizer.log({ type: "write", msg: `Executando TRIM de manutenção no SSD ${drv}...` });
-      const out = await App.ExecutarTRIM(drv);
-      btn.disabled = false;
-      btn.textContent = "Executar TRIM";
+      let out;
+      try { out = await App.ExecutarTRIM(drv); }
+      catch (e) { toast(`Erro no TRIM: ${String(e)}`, "erro"); }
+      finally { btn.disabled = false; btn.textContent = "Executar TRIM"; }
       abrirModal(`Resultado TRIM (${drv})`, `<div class="terminal-block"><div>${esc(out)}</div></div>`);
     }));
 
@@ -1734,9 +1924,10 @@ async function carregarDiscos() {
       btn.textContent = "Verificando…";
       Visualizer.show();
       Visualizer.log({ type: "read", msg: `Executando chkdsk /scan não destrutivo na unidade ${drv}...` });
-      const out = await App.ExecutarChkdsk(drv);
-      btn.disabled = false;
-      btn.textContent = "chkdsk /scan";
+      let out;
+      try { out = await App.ExecutarChkdsk(drv); }
+      catch (e) { toast(`Erro no chkdsk: ${String(e)}`, "erro"); }
+      finally { btn.disabled = false; btn.textContent = "chkdsk /scan"; }
       abrirModal(`Verificação de Integridade (${drv})`, `<div class="terminal-block"><div>${esc(out)}</div></div>`);
     }));
   } catch (e) {
@@ -1778,112 +1969,6 @@ async function auditarReparo() {
   }
 }
 
-/* ==========================================================================
-   DNS Benchmark & DoH
-   ========================================================================== */
-
-async function carregarDNSAtual() {
-  const container = $("#dns-atual");
-  if (!container) return;
-  container.innerHTML = '<span class="pulse-spinner"></span><span>Lendo o DNS usado pela conexão ativa…</span>';
-  try {
-    const atual = await App.ObterDNSAtual();
-    if (atual.erro) {
-      container.innerHTML = `<span class="dns-current-label">DNS atual indisponível</span><span class="field-hint">${esc(atual.erro)}</span>`;
-      return;
-    }
-    const servidores = (atual.servidores || []).join(" · ") || "DNS automático (sem servidor informado pelo Windows)";
-    container.innerHTML = `
-      <div>
-        <span class="dns-current-label">DNS em uso</span>
-        <strong>${esc(servidores)}</strong>
-        <span class="field-hint">Interface: ${esc(atual.interface || "rota padrão")}</span>
-      </div>
-      <button class="btn-secondary small-btn" id="btn-atualizar-dns">Atualizar</button>`;
-    $("#btn-atualizar-dns").addEventListener("click", carregarDNSAtual);
-  } catch (e) {
-    container.innerHTML = `<span class="dns-current-label">DNS atual indisponível</span><span class="field-hint">${esc(String(e))}</span>`;
-  }
-}
-
-async function usarDNS(servidores, nome, btn) {
-  if (!servidores || !servidores.length) return;
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Aplicando…";
-  }
-  try {
-    const resultado = await App.AplicarDNS(servidores);
-    toast(resultado.mensagem, resultado.ok ? "ok" : "erro");
-    if (resultado.ok) await carregarDNSAtual();
-  } catch (e) {
-    toast(`Não foi possível usar ${nome}: ${String(e)}`, "erro");
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "Usar este DNS";
-    }
-  }
-}
-
-async function testarDNS() {
-  const btn = $("#btn-testar-dns");
-  const resEl = $("#dns-resultado");
-  btn.disabled = true;
-  btn.innerHTML = `<span class="pulse-spinner"></span> Medindo…`;
-  resEl.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Resolvendo domínios de teste em múltiplos servidores DNS…</span></div>';
-
-  Visualizer.show();
-  Visualizer.log({ type: "net", msg: "Iniciando benchmark de latência DNS nos principais provedores globais..." });
-
-  try {
-    const provs = await App.BenchmarkDNS();
-    for (const p of (provs || [])) {
-      Visualizer.log({
-        type: "net",
-        msg: `DNS [${p.nome}] -> RTT Médio: ${p.avgRttMs}ms (Perda: ${p.perda}%)`
-      });
-    }
-
-    resEl.innerHTML = `
-      <div class="data-table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Provedor DNS</th>
-              <th>IPs</th>
-              <th>RTT Médio</th>
-              <th>Perda</th>
-              <th>Privacidade / Segurança</th>
-              <th>DoH (HTTPS)</th>
-              <th>Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${(provs || []).map((p) => `
-              <tr class="${p.recomendado ? 'highlight-row' : ''}">
-                <td><b>${esc(p.nome)}</b> ${p.recomendado ? '<span class="badge-tag speed">Mais Rápido</span>' : ''}</td>
-                <td class="mono small">${esc(p.ips.join(', '))}</td>
-                <td class="mono"><b>${p.avgRttMs} ms</b></td>
-                <td class="mono">${p.perda.toFixed(0)}%</td>
-                <td>${esc(p.privacidade)}</td>
-                <td class="mono small">${esc(p.dohUrl)}</td>
-                <td><button class="btn-secondary small-btn btn-usar-dns" data-ips="${esc(p.ips.join(','))}" data-nome="${esc(p.nome)}">Usar este DNS</button></td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-      </div>`;
-    $$(".btn-usar-dns").forEach((btnUsar) => btnUsar.addEventListener("click", () => {
-      usarDNS((btnUsar.dataset.ips || "").split(",").filter(Boolean), btnUsar.dataset.nome, btnUsar);
-    }));
-  } catch (e) {
-    resEl.innerHTML = `<div class="empty-results"><p>Erro ao medir DNS: ${esc(String(e))}</p></div>`;
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = "Testar Servidores DNS";
-  }
-}
 
 /* ==========================================================================
    Limpeza de Dispositivos Fantasmas (Ghost PnP Devices)
@@ -1967,6 +2052,448 @@ async function limparDispositivosFantasmas() {
     toast(`Erro na limpeza de dispositivos: ${e}`, "erro");
   } finally {
     btnLimpar.disabled = false;
+  }
+}
+
+/* ==========================================================================
+   Kernel Timer Resolution & Jitter de Sleep (valleyofdoom)
+   ========================================================================== */
+
+async function carregarTimerResolution() {
+  const container = $("#timerres-container");
+  if (!container) return;
+  container.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Lendo resolução do temporizador do kernel…</span></div>';
+
+  try {
+    const info = await App.ObterTimerResolution();
+    if (!info) {
+      container.innerHTML = '<div class="empty-results"><p>Não foi possível obter dados de resolução do temporizador.</p></div>';
+      return;
+    }
+
+    const curMs = Number(info.currentResolutionMs || 0).toFixed(3);
+    const minMs = Number(info.minResolutionMs || 0).toFixed(3);
+    const maxMs = Number(info.maxResolutionMs || 0).toFixed(3);
+    const isUltra = Number(info.currentResolutionMs || 0) <= 0.6;
+
+    container.innerHTML = `
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:16px;">
+        <div class="glass-card" style="padding:14px; border-left:3px solid ${isUltra ? 'var(--accent)' : 'var(--warn)'};">
+          <div class="muted small">Resolução Atual do Relógio</div>
+          <div style="font-size:22px; font-weight:800; color:${isUltra ? 'var(--accent)' : '#fff'}; margin-top:4px;">
+            ${curMs} ms
+          </div>
+          <div style="margin-top:4px;">
+            <span class="badge-tag ${isUltra ? 'rec' : 'obs'}">${isUltra ? 'Alta Precisão (0.5ms)' : 'Resolução Padrão'}</span>
+          </div>
+        </div>
+
+        <div class="glass-card" style="padding:14px;">
+          <div class="muted small">Resolução Máxima Suportada</div>
+          <div style="font-size:20px; font-weight:700; color:var(--text-primary); margin-top:4px;">
+            ${maxMs} ms
+          </div>
+          <div class="muted small" style="margin-top:4px;">Frequência: ${(1000 / Number(info.maxResolutionMs || 1)).toFixed(0)} Hz</div>
+        </div>
+
+        <div class="glass-card" style="padding:14px;">
+          <div class="muted small">Resolução Mínima (Default)</div>
+          <div style="font-size:20px; font-weight:700; color:var(--text-primary); margin-top:4px;">
+            ${minMs} ms
+          </div>
+          <div class="muted small" style="margin-top:4px;">Frequência: ${(1000 / Number(info.minResolutionMs || 15.625)).toFixed(0)} Hz</div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px;">
+        <button class="btn-primary small-btn" id="btn-timerres-05" ${isUltra ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Ativar Alta Precisão (0.500 ms)
+        </button>
+        <button class="btn-secondary small-btn" id="btn-timerres-default" ${!isUltra ? 'disabled' : ''}>
+          Restaurar Padrão do Windows
+        </button>
+        <button class="btn-secondary small-btn" id="btn-testar-sleep-precision">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Amostragem Rápida (20x)
+        </button>
+        <button class="btn-secondary small-btn" id="btn-live-sleep-monitor">
+          <span class="radar-dot" style="background:#94a3b8;"></span>
+          Monitor Contínuo ao Vivo
+        </button>
+      </div>
+
+      <div style="margin-bottom:12px; padding:10px 14px; background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.2); border-radius:8px;">
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:12px; color:#e2e8f0;">
+          <input type="checkbox" id="chk-persist-timer" ${info.isPersistent ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--accent); cursor:pointer;">
+          <span><b>Fixar 0.500ms permanentemente no Windows</b> (mantém ativo em segundo plano mesmo após fechar o Optimizer e ao ligar o PC)</span>
+        </label>
+      </div>
+
+      <div class="glass-card" style="margin-top:10px; padding:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div>
+            <h4 style="font-size:14px; font-weight:700; margin:0;">Osciloscópio de Precisão & Jitter (MeasureSleep)</h4>
+            <p class="muted small" style="margin:2px 0 0 0;">Linha tracejada verde indica alvo de 1.000 ms. Desvios na curva refletem atrasos do agendador.</p>
+          </div>
+          <span id="sleep-badge-score" class="badge-tag rec">Aguardando Amostras</span>
+        </div>
+        <canvas id="canvas-sleep-osc" style="width:100%; height:150px; border-radius:8px; display:block; background:#0c131d; border:1px solid rgba(255,255,255,0.08); margin-top:8px;"></canvas>
+        <div id="sleep-precision-resultado" style="margin-top:12px;"></div>
+      </div>
+    `;
+
+    const btn05 = $("#btn-timerres-05");
+    if (btn05) btn05.addEventListener("click", () => aplicarTimerResolution(0.5, true));
+
+    const btnDef = $("#btn-timerres-default");
+    if (btnDef) btnDef.addEventListener("click", () => aplicarTimerResolution(15.625, false));
+
+    const btnSleep = $("#btn-testar-sleep-precision");
+    if (btnSleep) btnSleep.addEventListener("click", testarPrecisaoSleep);
+
+    const btnLive = $("#btn-live-sleep-monitor");
+    if (btnLive) btnLive.addEventListener("click", alternarMonitorLiveSleep);
+
+    const chkPersist = $("#chk-persist-timer");
+    if (chkPersist) {
+      chkPersist.addEventListener("change", async (e) => {
+        const ativar = e.target.checked;
+        Visualizer.show();
+        Visualizer.log({ type: "write", msg: `${ativar ? 'Configurando' : 'Removendo'} persistência do temporizador do kernel na inicialização do Windows...` });
+        try {
+          const res = await App.ConfigurarPersistenciaTimer(ativar, 0.5);
+          toast(res.mensagem, res.ok ? "ok" : "err");
+          Visualizer.log({ type: res.ok ? "apply" : "fail", msg: res.mensagem });
+        } catch (err) {
+          toast("Erro ao configurar persistência: " + err, "err");
+        } finally {
+          await carregarTimerResolution();
+        }
+      });
+    }
+
+    // Renderiza gráfico inicial com medição rápida
+    setTimeout(() => {
+      testarPrecisaoSleep();
+    }, 150);
+
+  } catch (e) {
+    container.innerHTML = `<div class="empty-results"><p>Erro ao ler timer resolution: ${esc(String(e))}</p></div>`;
+  }
+}
+
+let liveSleepTimer = null;
+let liveSleepBuffer = [];
+
+function renderSleepOscilloscope(canvasId, samples, targetMs = 1.0) {
+  const canvas = typeof canvasId === "string" ? (typeof document !== "undefined" && document.getElementById ? document.getElementById(canvasId) : null) : canvasId;
+  if (!canvas || typeof canvas.getContext !== "function") return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const rect = canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : { width: 560, height: 150 };
+  const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+  const w = (canvas.width = (rect.width || 560) * dpr);
+  const h = (canvas.height = (rect.height || 150) * dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  if (!samples || samples.length === 0) return;
+
+  const maxSample = Math.max(...samples, targetMs * 2.0);
+  const maxScale = Math.min(Math.max(maxSample * 1.25, 2.5), 20.0);
+
+  ctx.fillStyle = "#0c131d";
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.font = `${10 * dpr}px Inter, sans-serif`;
+  ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+
+  const gridSteps = [0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.625].filter(v => v <= maxScale);
+  for (const gVal of gridSteps) {
+    const gy = h - (gVal / maxScale) * (h * 0.80) - h * 0.10;
+    ctx.strokeStyle = Math.abs(gVal - targetMs) < 0.05 ? "rgba(16, 185, 129, 0.45)" : "rgba(255, 255, 255, 0.06)";
+    ctx.lineWidth = Math.abs(gVal - targetMs) < 0.05 ? 1.5 * dpr : 1 * dpr;
+    if (typeof ctx.setLineDash === "function") {
+      ctx.setLineDash(Math.abs(gVal - targetMs) < 0.05 ? [4 * dpr, 4 * dpr] : []);
+    }
+    ctx.beginPath();
+    ctx.moveTo(0, gy);
+    ctx.lineTo(w, gy);
+    ctx.stroke();
+
+    ctx.fillText(`${gVal.toFixed(1)}ms`, 8 * dpr, gy - 3 * dpr);
+  }
+  if (typeof ctx.setLineDash === "function") ctx.setLineDash([]);
+
+  const step = samples.length > 1 ? (w - 24 * dpr) / (samples.length - 1) : w;
+  const startX = 12 * dpr;
+  const points = samples.map((val, idx) => {
+    const clamped = Math.max(0, Math.min(maxScale, val));
+    const y = h - (clamped / maxScale) * (h * 0.80) - h * 0.10;
+    return { x: startX + idx * step, y: y, val: val };
+  });
+
+  // Área com gradiente
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const cpX = (prev.x + curr.x) / 2;
+    ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
+  }
+  ctx.lineTo(points[points.length - 1].x, h);
+  ctx.lineTo(points[0].x, h);
+  ctx.closePath();
+
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "rgba(16, 185, 129, 0.28)");
+  grad.addColorStop(1, "rgba(16, 185, 129, 0.0)");
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Curva principal
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const cpX = (prev.x + curr.x) / 2;
+    ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
+  }
+  ctx.strokeStyle = "#10b981";
+  ctx.lineWidth = 2 * dpr;
+  ctx.shadowColor = "#10b981";
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Pontos individuais
+  for (const pt of points) {
+    const delta = Math.abs(pt.val - targetMs);
+    let color = "#10b981";
+    if (delta > 0.8) color = "#ef4444";
+    else if (delta > 0.25) color = "#f59e0b";
+
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, (delta > 0.8 ? 4.5 : 3) * dpr, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+}
+
+async function alternarMonitorLiveSleep() {
+  const btn = $("#btn-live-sleep-monitor");
+  if (liveSleepTimer) {
+    clearInterval(liveSleepTimer);
+    liveSleepTimer = null;
+    if (btn) {
+      btn.innerHTML = `<span class="radar-dot" style="background:#94a3b8;"></span> Monitor Contínuo ao Vivo`;
+      btn.classList.remove("btn-primary");
+      btn.classList.add("btn-secondary");
+    }
+    toast("Monitoramento contínuo pausado.", "info");
+    return;
+  }
+
+  if (btn) {
+    btn.innerHTML = `<span class="radar-dot" style="background:#10b981;"></span> Pausar Monitor Contínuo`;
+    btn.classList.remove("btn-secondary");
+    btn.classList.add("btn-primary");
+  }
+  toast("Monitoramento em tempo real ativado.", "ok");
+
+  const tick = async () => {
+    try {
+      const res = await App.MedirSleepPrecision(10);
+      if (res && res.samples) {
+        liveSleepBuffer = liveSleepBuffer.concat(res.samples);
+        if (liveSleepBuffer.length > 40) {
+          liveSleepBuffer = liveSleepBuffer.slice(-40);
+        }
+        renderSleepOscilloscope("canvas-sleep-osc", liveSleepBuffer, 1.0);
+        const scoreEl = $("#sleep-badge-score");
+        if (scoreEl) scoreEl.textContent = res.jitterScore;
+        const resEl = $("#sleep-precision-resultado");
+        if (resEl) {
+          resEl.innerHTML = `
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; font-size:12px;">
+              <div><span class="muted">Alvo:</span> <b>${res.targetMs} ms</b></div>
+              <div><span class="muted">Média Recente:</span> <b>${res.averageMs} ms</b></div>
+              <div><span class="muted">Mínimo:</span> <b>${res.minMs} ms</b></div>
+              <div><span class="muted">Máximo:</span> <b>${res.maxMs} ms</b></div>
+              <div><span class="muted">Jitter (StdDev):</span> <b style="color:var(--accent);">${res.stdDevMs} ms</b></div>
+            </div>
+          `;
+        }
+      }
+    } catch (e) {
+      // Silencioso
+    }
+  };
+
+  await tick();
+  liveSleepTimer = setInterval(tick, 1500);
+}
+
+async function aplicarTimerResolution(desiredMs, ativar) {
+  try {
+    Visualizer.show();
+    Visualizer.log({ type: "write", msg: `Ajustando NtSetTimerResolution para ${desiredMs} ms...` });
+    const res = await App.DefinirTimerResolution(desiredMs, ativar);
+    if (res && res.ok) {
+      toast(res.mensagem || "Resolução do temporizador atualizada.", "ok");
+      Visualizer.log({ type: "verify", msg: res.mensagem });
+    } else {
+      toast((res && res.mensagem) || "Falha ao definir timer resolution", "err");
+      Visualizer.log({ type: "fail", msg: (res && res.mensagem) || "Erro" });
+    }
+  } catch (e) {
+    toast("Erro ao configurar timer: " + e, "err");
+  } finally {
+    await carregarTimerResolution();
+  }
+}
+
+async function testarPrecisaoSleep() {
+  const btn = $("#btn-testar-sleep-precision");
+  const resEl = $("#sleep-precision-resultado");
+  const scoreEl = $("#sleep-badge-score");
+  if (!resEl) return;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="pulse-spinner"></span> Amostrando 20x…`;
+  }
+
+  Visualizer.show();
+  Visualizer.log({ type: "read", msg: "Iniciando MeasureSleep (20 amostras de 1.0ms)..." });
+
+  try {
+    const res = await App.MedirSleepPrecision(20);
+    Visualizer.log({
+      type: "verify",
+      msg: `Sleep delta médio: ${res.averageMs} ms (Desvio Padrão: ${res.stdDevMs} ms) - ${res.jitterScore}`
+    });
+
+    if (scoreEl) {
+      scoreEl.textContent = res.jitterScore;
+    }
+
+    renderSleepOscilloscope("canvas-sleep-osc", res.samples, res.targetMs || 1.0);
+
+    resEl.innerHTML = `
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; font-size:12px;">
+        <div><span class="muted">Alvo:</span> <b>${res.targetMs} ms</b></div>
+        <div><span class="muted">Média Real:</span> <b>${res.averageMs} ms</b></div>
+        <div><span class="muted">Mínimo:</span> <b>${res.minMs} ms</b></div>
+        <div><span class="muted">Máximo:</span> <b>${res.maxMs} ms</b></div>
+        <div><span class="muted">Desvio Padrão (Jitter):</span> <b style="color:var(--accent);">${res.stdDevMs} ms</b></div>
+      </div>
+      <div style="margin-top:8px; font-size:11px; color:var(--text-secondary);">
+        💡 Quanto menor o desvio padrão (Jitter), mais consistente é o frame pacing e menores são as variações de latência de entrada em jogos e renderização em tempo real.
+      </div>
+    `;
+  } catch (e) {
+    resEl.innerHTML = `<div class="empty-results"><p>Erro ao medir precisão de sleep: ${esc(String(e))}</p></div>`;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:6px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Amostragem Rápida (20x)`;
+    }
+  }
+}
+
+/* ==========================================================================
+   Inspetor de Interrupções PCIe e Modo MSI (valleyofdoom / AutoGpuAffinity)
+   ========================================================================== */
+
+let listaDispositivosMSI = [];
+
+async function escanearDispositivosMSI() {
+  const btn = $("#btn-escanear-msi");
+  const resEl = $("#msi-resultado");
+  if (!resEl) return;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="pulse-spinner"></span> Escaneando PCIe…`;
+  }
+  resEl.innerHTML = '<div class="health-loading"><span class="pulse-spinner"></span><span>Audito adaptadores PCIe (GPU, Rede, Controladores USB)...</span></div>';
+
+  Visualizer.show();
+  Visualizer.log({ type: "read", msg: "Consultando registro PnP para adaptadores PCIe e modos de interrupção MSI..." });
+
+  try {
+    listaDispositivosMSI = await App.ListarDispositivosMSI();
+    if (!listaDispositivosMSI || !listaDispositivosMSI.length) {
+      resEl.innerHTML = '<div class="glass-card"><p class="muted-text">Nenhum adaptador PCIe auditável encontrado.</p></div>';
+      return;
+    }
+
+    Visualizer.log({
+      type: "read",
+      msg: `Foram encontrados ${listaDispositivosMSI.length} adaptadores PCIe auditados.`
+    });
+
+    resEl.innerHTML = `
+      <div style="margin-bottom:12px;">
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">
+          Modo MSI (Message Signaled Interrupts) elimina compartilhamento de linhas IRQ e reduz a latência de DPC/ISR de placas de vídeo e rede.
+        </p>
+        <div class="terminal-block" style="max-height:280px; overflow-y:auto;">
+          ${listaDispositivosMSI.map((d, i) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:12px;">
+              <div style="flex:1; margin-right:12px;">
+                <div><b>${esc(d.nome)}</b> <span class="badge-tag ${d.classe === 'Display' ? 'rec' : 'obs'}">${esc(d.classe || 'PCIe')}</span></div>
+                <div class="mono muted small" style="margin-top:2px;">${esc(d.id)}</div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="badge-tag ${d.msiSupported ? 'rec' : 'obs'}">${esc(d.statusRotulo)}</span>
+                <button class="btn-${d.msiSupported ? 'secondary' : 'primary'} small-btn btn-toggle-msi" data-idx="${i}">
+                  ${d.msiSupported ? 'Desativar MSI' : 'Ativar Modo MSI'}
+                </button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+
+    $$(".btn-toggle-msi").forEach((b) => b.addEventListener("click", async () => {
+      const idx = Number(b.dataset.idx);
+      const dev = listaDispositivosMSI[idx];
+      if (!dev) return;
+      await alternarModoMSIDispositivo(dev.caminhoRegistro, !dev.msiSupported);
+    }));
+
+  } catch (e) {
+    resEl.innerHTML = `<div class="empty-results"><p>Erro ao auditar dispositivos MSI: ${esc(String(e))}</p></div>`;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = "Escanear Dispositivos";
+    }
+  }
+}
+
+async function alternarModoMSIDispositivo(caminho, ativar) {
+  try {
+    Visualizer.show();
+    Visualizer.log({ type: "write", msg: `${ativar ? 'Ativando' : 'Desativando'} modo MSI no registro...` });
+    const res = await App.AlternarModoMSI(caminho, ativar);
+    if (res && res.ok) {
+      toast(res.mensagem, "ok");
+      Visualizer.log({ type: "verify", msg: res.mensagem });
+    } else {
+      toast((res && res.mensagem) || "Falha ao alterar modo MSI", "err");
+      Visualizer.log({ type: "fail", msg: (res && res.mensagem) || "Erro" });
+    }
+  } catch (e) {
+    toast("Erro ao alternar modo MSI: " + e, "err");
+  } finally {
+    await escanearDispositivosMSI();
   }
 }
 
@@ -2117,6 +2644,39 @@ async function aplicarPerfilUso(key) {
   const p = (listaPerfisUso || []).find((x) => x.key === key);
   if (!p) return;
 
+  // Aplicação manual é imediata e acompanhada pelo Visualizador. O benchmark
+  // comparativo é opcional e não deve bloquear uma alteração solicitada.
+  if (typeof App.AplicarPerfilUso === "function") {
+    Visualizer.show();
+    Visualizer.log({ type: "write", msg: `Aplicando perfil [${key.toUpperCase()}] — gravação e verificação em andamento...` });
+    toast(`Aplicando perfil ${p.nome}…`, "info");
+    try {
+      const res = await App.AplicarPerfilUso(key, false);
+      for (const r of (res || [])) {
+        Visualizer.log({
+          type: r.estado === "ok" ? "apply" : "fail",
+          msg: `[${(r.estado || "resultado").toUpperCase()}] ${r.nome}: ${r.mensagem}`
+        });
+      }
+      mostrarResultados(`Aplicação do Perfil ${p.nome}`, res);
+      const falhas = (res || []).filter((r) => r.estado === "falhou").length;
+      const pulados = (res || []).filter((r) => r.estado === "pulado").length;
+      const aplicados = (res || []).filter((r) => r.estado === "ok").length;
+      toast(
+        falhas || pulados
+          ? `${aplicados} aplicado(s), ${pulados} pulado(s), ${falhas} falha(s). Veja os detalhes.`
+          : `${aplicados} ajuste(s) aplicado(s) e verificado(s).`,
+        falhas || pulados ? "erro" : "ok",
+        4500
+      );
+      await carregarEstadoPerfis();
+      await diagnosticar();
+    } catch (e) {
+      toast(`Não foi possível aplicar o perfil: ${String(e)}`, "erro");
+    }
+    return;
+  }
+
   // 1. Iniciar Benchmark Base Pré-Aplicação (60 segundos)
   abrirModalBenchmark(
     `Benchmark Base Obrigatório (60s) — ${p.nome}`,
@@ -2190,13 +2750,28 @@ async function aplicarPerfilUso(key) {
     Visualizer.log({ type: "write", msg: `Aplicando configurações do perfil [${key.toUpperCase()}] com snapshot transacional...` });
 
     toast(`Aplicando perfil ${p.nome}…`, "info");
-    const resAplicacao = await App.AplicarPerfilComBenchmark(key, false, reportAntes);
+    let resAplicacao;
+    try {
+      resAplicacao = await App.AplicarPerfilComBenchmark(key, false, reportAntes);
+    } catch (e) {
+      benchmarkEmAndamento = false;
+      fecharModalBenchmark();
+      toast(`Não foi possível aplicar o perfil: ${String(e)}`, "erro");
+      await carregarEstadoPerfis();
+      return;
+    }
 
     for (const r of (resAplicacao.resultados || [])) {
       Visualizer.log({
         type: r.estado === "ok" ? "write" : (r.estado === "pulado" ? "read" : "fail"),
         msg: `[${r.estado.toUpperCase()}] ${r.nome}: ${r.mensagem}`
       });
+    }
+    if ((resAplicacao.resultados || []).some((r) => r.estado === "falhou")) {
+      benchmarkEmAndamento = false;
+      toast("A aplicação do perfil terminou com falhas; nenhuma medição pós-aplicação será iniciada.", "erro");
+      await carregarEstadoPerfis();
+      return;
     }
 
     // 4. Estabilização e Benchmark Pós-Aplicação (60s)
@@ -2310,7 +2885,13 @@ async function restaurarPerfilUso(key) {
   Visualizer.log({ type: "revert", msg: `Revertendo lote de transação ativo do perfil [${key.toUpperCase()}]...` });
 
   toast("Restaurando estado anterior ao perfil…", "info");
-  const res = await App.RestaurarPerfilUso(key);
+  let res;
+  try {
+    res = await App.RestaurarPerfilUso(key);
+  } catch (e) {
+    toast(`Não foi possível restaurar o perfil: ${String(e)}`, "erro");
+    return;
+  }
 
   for (const r of (res || [])) {
     Visualizer.log({
@@ -2319,7 +2900,11 @@ async function restaurarPerfilUso(key) {
     });
   }
 
-  toast("Perfil restaurado com sucesso.", "ok");
+  if ((res || []).some((r) => r.estado === "falhou")) {
+    toast("A restauração terminou com falhas.", "erro");
+  } else {
+    toast("Perfil restaurado com sucesso.", "ok");
+  }
   await carregarEstadoPerfis();
   await diagnosticar();
 }
@@ -2335,6 +2920,122 @@ const historyRAM = new Array(MAX_CHART_SAMPLES).fill(0);
 const historyPing = new Array(MAX_CHART_SAMPLES).fill(0);
 
 let telemetriaTimer = null;
+let telemetriaEmAndamento = false;
+let telemetriaFalhasConsecutivas = 0;
+
+function renderCatalogDonutChart(canvasId, percent, aplicados, total) {
+  const canvas = typeof canvasId === "string" ? (typeof document !== "undefined" && document.getElementById ? document.getElementById(canvasId) : null) : canvasId;
+  if (!canvas || typeof canvas.getContext !== "function") return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const rect = canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : { width: 100, height: 100 };
+  const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+  const size = (rect.width || 100) * dpr;
+  canvas.width = size;
+  canvas.height = size;
+  ctx.clearRect(0, 0, size, size);
+
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = (size / 2) - 8 * dpr;
+  const lineWidth = 9 * dpr;
+
+  // Anel de Fundo
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+
+  // Arco Ativo com Gradiente
+  const startAngle = -Math.PI / 2;
+  const endAngle = startAngle + (Math.PI * 2 * (percent / 100));
+
+  const grad = ctx.createLinearGradient(0, 0, size, size);
+  grad.addColorStop(0, "#00f0ff");
+  grad.addColorStop(1, "#10b981");
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, startAngle, endAngle);
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = "round";
+  ctx.shadowColor = "#10b981";
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Texto Central
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `bold ${16 * dpr}px Inter, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(`${percent}%`, cx, cy - 3 * dpr);
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.font = `${8 * dpr}px Inter, sans-serif`;
+  ctx.fillText("ATIVO", cx, cy + 11 * dpr);
+}
+
+function renderDNSBenchmarkChart(canvasId, providers) {
+  const canvas = typeof canvasId === "string" ? (typeof document !== "undefined" && document.getElementById ? document.getElementById(canvasId) : null) : canvasId;
+  if (!canvas || typeof canvas.getContext !== "function") return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const valid = (providers || []).filter(p => (p.avgRttMs || p.rttAvgMs) > 0 && (p.avgRttMs || p.rttAvgMs) < 999);
+  if (!valid.length) return;
+
+  const rect = canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : { width: 520, height: 160 };
+  const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+  const w = (canvas.width = (rect.width || 520) * dpr);
+  const rowHeight = 26 * dpr;
+  const h = (canvas.height = Math.max(130 * dpr, valid.length * rowHeight + 25 * dpr));
+  ctx.clearRect(0, 0, w, h);
+
+  const maxRTT = Math.max(...valid.map(p => (p.avgRttMs || p.rttAvgMs)), 60);
+
+  ctx.font = `${10.5 * dpr}px Inter, sans-serif`;
+  const labelWidth = 130 * dpr;
+  const barAreaWidth = w - labelWidth - 80 * dpr;
+
+  valid.forEach((p, idx) => {
+    const rtt = p.avgRttMs || p.rttAvgMs || 0;
+    const y = 14 * dpr + idx * rowHeight;
+    const barW = Math.max(10 * dpr, (rtt / maxRTT) * barAreaWidth);
+
+    // Nome do Provedor
+    ctx.fillStyle = "#e2e8f0";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(p.nome, 10 * dpr, y + 7 * dpr);
+
+    // Fundo da barra
+    ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+    ctx.fillRect(labelWidth, y, barAreaWidth, 14 * dpr);
+
+    // Barra com Cor por Latência
+    let barColor = "#10b981";
+    if (rtt > 50) barColor = "#3b82f6";
+    if (rtt > 100) barColor = "#f59e0b";
+    if (rtt > 150) barColor = "#ef4444";
+
+    const grad = ctx.createLinearGradient(labelWidth, y, labelWidth + barW, y);
+    grad.addColorStop(0, barColor);
+    grad.addColorStop(1, barColor + "cc");
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(labelWidth, y, barW, 14 * dpr);
+
+    // RTT em Texto
+    ctx.fillStyle = barColor;
+    ctx.textAlign = "left";
+    ctx.font = `bold ${10.5 * dpr}px Inter, sans-serif`;
+    ctx.fillText(`${rtt.toFixed(1)} ms`, labelWidth + barW + 8 * dpr, y + 7 * dpr);
+    ctx.font = `${10.5 * dpr}px Inter, sans-serif`;
+  });
+}
 
 function renderMicroChart(canvasId, dataArray, strokeColor, fillColor, maxScale = 100) {
   const canvas = typeof canvasId === "string" ? document.getElementById(canvasId) : canvasId;
@@ -2416,9 +3117,13 @@ function renderMicroChart(canvasId, dataArray, strokeColor, fillColor, maxScale 
 }
 
 async function atualizarTelemetriaAoVivo() {
+  if (telemetriaEmAndamento || !App || typeof App.ObterTelemetriaAoVivo !== "function") return;
+  telemetriaEmAndamento = true;
   try {
     const data = await App.ObterTelemetriaAoVivo();
     if (!data) return;
+    if (data.erro) throw new Error(data.erro);
+    telemetriaFalhasConsecutivas = 0;
 
     // Atualiza buffers de histórico
     historyCPU.shift();
@@ -2440,6 +3145,7 @@ async function atualizarTelemetriaAoVivo() {
     if (elCpuVal) elCpuVal.textContent = `${(data.cpuUsagePercent || 0).toFixed(1)}%`;
     const elCpuExtra = $("#telem-cpu-extra");
     if (elCpuExtra) {
+      if (data.cpuFrequencyAvailable === false) elCpuExtra.textContent = "Frequência N/D";
       const tempStr = data.cpuTempCelsius !== undefined && data.cpuTempCelsius !== null ? `${data.cpuTempCelsius.toFixed(1)}°C` : "Sensor N/D";
       elCpuExtra.textContent = `${(data.cpuFrequencyMhz || 0).toFixed(0)} MHz · ${tempStr}`;
     }
@@ -2486,8 +3192,27 @@ async function atualizarTelemetriaAoVivo() {
         </div>
       `).join("");
     }
+    // Valores ausentes permanecem explicitamente indisponíveis, nunca zero inventado.
+    if (data.cpuFrequencyAvailable === false && elCpuExtra) elCpuExtra.textContent = "Frequência N/D";
+    if (data.gpuMemoryAvailable === false && elGpuExtra) elGpuExtra.textContent = `${data.gpuTempCelsius != null ? `${data.gpuTempCelsius.toFixed(1)}Â°C` : "Sensor N/D"} · VRAM N/D`;
+    if (data.gpuMemoryAvailable === false && elGpuVramTotal) elGpuVramTotal.textContent = "Memória Dedicada: N/D";
+    if (data.ramTotalMb <= 0) {
+      if (elRamVal) elRamVal.textContent = "N/D";
+      if (elRamExtra) elRamExtra.textContent = "Memória N/D";
+      if (elRamAvail) elRamAvail.textContent = "Livre: N/D";
+    }
+    if (data.thermalStatusAvailable === false && elThrottling) elThrottling.textContent = "Throttling: N/D";
   } catch (e) {
-    // Polling silencioso
+    telemetriaFalhasConsecutivas++;
+    const badge = $("#telemetria-live-badge");
+    if (badge) {
+      badge.textContent = "TELEMETRIA INDISPONÍVEL";
+      badge.style.color = telemetriaFalhasConsecutivas < 3 ? "var(--warn)" : "var(--danger)";
+      badge.title = `Falha ${telemetriaFalhasConsecutivas}: ${e.message || e}`;
+    }
+    console.warn("Telemetria indisponível:", e);
+  } finally {
+    telemetriaEmAndamento = false;
   }
 }
 

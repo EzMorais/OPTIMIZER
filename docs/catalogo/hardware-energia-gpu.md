@@ -95,6 +95,14 @@ Setting  = 48e6b7a6-50f5-4782-a5d4-53bb8f07e226  (0=Desabilitado, 1=Ativado/padr
 - **Recomendação de produto**: **detectar e informar** se está ativo (via WMI, `Win32_PNPAllocatedResource`/`Win32_DeviceMemoryAddress`, olhando o tamanho da janela de memória alocada à GPU), nunca tentar configurar — está fora do alcance do software.
 - **Veredicto**: confirmado (quanto à natureza do recurso); apresentar só como card informativo, não como toggle.
 
+## 10. Message Signaled Interrupts (MSI Mode) na GPU (`#msi-mode`)
+
+- **Chave**: `HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000\Interrupt Management\MessageSignaledInterruptProperties`, valor `MSISupported`, REG_DWORD. Padrão antigo = `0` (Line-Based IRQ) ou ausente. Otimizado = `1` (MSI Mode habilitado).
+- **Ganho**: substitui o mecanismo de interrupção legado compartilhado por interrupções diretas via barramento PCIe endereçadas por mensagens. Elimina conflitos de IRQ sharing e reduz o tempo de serviço de interrupções (ISR) e chamadas de procedimento diferido (DPC) no driver de vídeo.
+- **Impacto**: Alto em sistemas com periféricos múltiplos, mouses de alta taxa e placas de som dedicadas.
+- **Risco**: Baixo em GPUs modernas (NVIDIA GTX 900+ / RTX, AMD GCN+ / RDNA).
+- **Veredicto**: confirmado (respaldado por `valleyofdoom/PC-Tuning` §11.38 e `valleyofdoom/AutoGpuAffinity`).
+
 ---
 
 ## Regras para a UI (derivadas deste domínio)

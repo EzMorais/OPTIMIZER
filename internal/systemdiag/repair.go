@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"optimizer/internal/console"
 )
 
 // RepairAuditReport contém os resultados de verificação de integridade não destrutiva.
@@ -29,6 +31,7 @@ func ExecutarAuditoriaIntegridade(ctx context.Context) RepairAuditReport {
 
 	// 1. DISM /Online /Cleanup-Image /CheckHealth (rápido e não destrutivo)
 	cmdDISM := exec.CommandContext(ctx, "dism.exe", "/Online", "/Cleanup-Image", "/CheckHealth")
+	console.HideWindow(cmdDISM)
 	outDISM, err := cmdDISM.CombinedOutput()
 	rep.DISMChecked = true
 	rep.DISMOutput = strings.TrimSpace(string(outDISM))
@@ -38,6 +41,7 @@ func ExecutarAuditoriaIntegridade(ctx context.Context) RepairAuditReport {
 
 	// 2. SFC /verifyonly (somente verifica integridade sem alterar arquivos)
 	cmdSFC := exec.CommandContext(ctx, "sfc.exe", "/verifyonly")
+	console.HideWindow(cmdSFC)
 	outSFC, errSFC := cmdSFC.CombinedOutput()
 	rep.SFCChecked = true
 	rep.SFCOutput = strings.TrimSpace(string(outSFC))

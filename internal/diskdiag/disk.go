@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"optimizer/internal/console"
 )
 
 // DriveInfo contém metadados de uma unidade de disco.
@@ -35,6 +37,7 @@ func ListarUnidades(ctx context.Context) ([]DriveInfo, error) {
 	// Executa PowerShell Get-PhysicalDisk para ler MediaType e BusType nativamente
 	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
 		`Get-PhysicalDisk | Select-Object DeviceId, MediaType, BusType, HealthStatus | ConvertTo-Json -Compress`)
+	console.HideWindow(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		// Fallback para unidades padrão
@@ -80,6 +83,7 @@ func ExecutarTRIM(ctx context.Context, letter string) (string, error) {
 	letter = strings.TrimSuffix(letter, ":")
 	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
 		fmt.Sprintf("Optimize-Volume -DriveLetter %s -ReTrim -Verbose", letter))
+	console.HideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
 }
@@ -88,6 +92,7 @@ func ExecutarTRIM(ctx context.Context, letter string) (string, error) {
 func ExecutarChkdskScan(ctx context.Context, letter string) (string, error) {
 	letter = strings.TrimSuffix(letter, "\\")
 	cmd := exec.CommandContext(ctx, "chkdsk.exe", letter, "/scan")
+	console.HideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
 }

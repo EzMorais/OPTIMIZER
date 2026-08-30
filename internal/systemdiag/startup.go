@@ -2,6 +2,7 @@
 package systemdiag
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,12 +27,23 @@ const (
 
 // ListarStartupItems lista programas na inicialização do HKCU e HKLM.
 func ListarStartupItems(b winreg.Backend) ([]StartupItem, error) {
+	return ListarStartupItemsContext(context.Background(), b)
+}
+
+// ListarStartupItemsContext aborta entre leituras quando a janela da UI expira.
+func ListarStartupItemsContext(ctx context.Context, b winreg.Backend) ([]StartupItem, error) {
 	var itens []StartupItem
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	// 1. HKCU Run
 	nomesHKCU, err := b.ValueNames(winreg.HKCU, regRun)
 	if err == nil {
 		for _, n := range nomesHKCU {
+			if err := ctx.Err(); err != nil {
+				return itens, err
+			}
 			cmd, err := b.GetString(winreg.HKCU, regRun, n)
 			if err == nil && strings.TrimSpace(cmd) != "" {
 				itens = append(itens, StartupItem{
@@ -50,6 +62,9 @@ func ListarStartupItems(b winreg.Backend) ([]StartupItem, error) {
 	nomesHKLM, err := b.ValueNames(winreg.HKLM, regRun)
 	if err == nil {
 		for _, n := range nomesHKLM {
+			if err := ctx.Err(); err != nil {
+				return itens, err
+			}
 			cmd, err := b.GetString(winreg.HKLM, regRun, n)
 			if err == nil && strings.TrimSpace(cmd) != "" {
 				itens = append(itens, StartupItem{
@@ -70,6 +85,9 @@ func ListarStartupItems(b winreg.Backend) ([]StartupItem, error) {
 		startupDir := filepath.Join(appData, "Microsoft", "Windows", "Start Menu", "Programs", "Startup")
 		entries, _ := os.ReadDir(startupDir)
 		for _, e := range entries {
+			if err := ctx.Err(); err != nil {
+				return itens, err
+			}
 			if !e.IsDir() && !strings.HasSuffix(strings.ToLower(e.Name()), ".ini") {
 				itens = append(itens, StartupItem{
 					ID:        "folder." + e.Name(),

@@ -50,19 +50,32 @@ func TestAppDiagnosticar(t *testing.T) {
 	app := novoAppTeste(t)
 
 	diagPessoal := app.Diagnosticar("pessoal")
-	if diagPessoal.Total != 51 {
-		t.Errorf("Total pessoal = %d, esperado 51", diagPessoal.Total)
+	if diagPessoal.Total != 55 {
+		t.Errorf("Total pessoal = %d, esperado 55", diagPessoal.Total)
 	}
 	if diagPessoal.Perfil != "pessoal" {
 		t.Errorf("Perfil = %s, esperado pessoal", diagPessoal.Perfil)
 	}
 
 	diagTrabalho := app.Diagnosticar("trabalho")
-	if diagTrabalho.Total != 37 {
-		t.Errorf("Total trabalho = %d, esperado 37", diagTrabalho.Total)
+	if diagTrabalho.Total != 40 {
+		t.Errorf("Total trabalho = %d, esperado 40", diagTrabalho.Total)
 	}
 	if diagTrabalho.Perfil != "trabalho" {
 		t.Errorf("Perfil = %s, esperado trabalho", diagTrabalho.Perfil)
+	}
+}
+
+func TestAppRecomendacoesRespeitamGPUDetectada(t *testing.T) {
+	app := novoAppTeste(t)
+	app.benchCollector = telemetry.NewCollector(&telemetry.MockProvider{HardwareInfo: telemetry.HardwareStaticInfo{
+		CPUName: "CPU teste", PhysicalCores: 4, LogicalCores: 8, GPUName: "GPU integrada", TotalRAMMB: 8192,
+	}})
+	diag := app.Diagnosticar("pessoal")
+	for _, item := range diag.Itens {
+		if strings.Contains(item.ID, "nvidia") && item.Recomendado {
+			t.Fatalf("%s foi recomendado sem GPU NVIDIA: %s", item.ID, item.MotivoRecomendacao)
+		}
 	}
 }
 
@@ -250,8 +263,8 @@ func TestAppResumoVisaoMostraCoberturaECategoriasDoCatalogo(t *testing.T) {
 	}
 
 	visao := app.ResumoVisao("pessoal")
-	if visao.TotalAjustes != 51 {
-		t.Errorf("total de ajustes = %d, esperado 51", visao.TotalAjustes)
+	if visao.TotalAjustes != 55 {
+		t.Errorf("total de ajustes = %d, esperado 55", visao.TotalAjustes)
 	}
 	if visao.Aplicados != antes.Aplicados+1 {
 		t.Errorf("aplicados = %d, esperado %d após aplicar um ajuste", visao.Aplicados, antes.Aplicados+1)
@@ -377,5 +390,39 @@ func TestAppMTU(t *testing.T) {
 	}
 	if res.MTUAtual > 0 && res.MTUAtual < 576 {
 		t.Errorf("MTU inválido: %d", res.MTUAtual)
+	}
+}
+
+func TestAppTimerResolution(t *testing.T) {
+	app := novoAppTeste(t)
+	info := app.ObterTimerResolution()
+	if info.MinResolutionMs <= 0 || info.MaxResolutionMs <= 0 {
+		t.Errorf("Timer resolution inválida: %+v", info)
+	}
+
+	setRes := app.DefinirTimerResolution(0.5, true)
+	if !setRes.OK && setRes.Mensagem == "" {
+		t.Errorf("Resposta de DefinirTimerResolution inválida: %+v", setRes)
+	}
+}
+
+func TestAppMedirSleepPrecision(t *testing.T) {
+	app := novoAppTeste(t)
+	res := app.MedirSleepPrecision(10)
+	if len(res.Samples) != 10 || res.AverageMs <= 0 {
+		t.Errorf("Sleep precision retornou dados inválidos: %+v", res)
+	}
+}
+
+func TestAppDispositivosMSI(t *testing.T) {
+	app := novoAppTeste(t)
+	devs := app.ListarDispositivosMSI()
+	if devs == nil {
+		t.Fatal("ListarDispositivosMSI não deve retornar nil")
+	}
+
+	res := app.AlternarModoMSI("SYSTEM\\Test", true)
+	if res.Mensagem == "" {
+		t.Errorf("Mensagem vazia em AlternarModoMSI: %+v", res)
 	}
 }

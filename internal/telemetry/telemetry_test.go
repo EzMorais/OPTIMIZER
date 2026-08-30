@@ -6,6 +6,37 @@ import (
 	"time"
 )
 
+func TestNormalizeProcessCPUUsesLogicalProcessorsAndClamps(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   float64
+		logical int
+		want    float64
+	}{
+		{name: "normaliza contador agregado", value: 240, logical: 12, want: 20},
+		{name: "limita acima de cem", value: 2400, logical: 12, want: 100},
+		{name: "protege processadores inválidos", value: 20, logical: 0, want: 20},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeProcessCPU(tt.value, tt.logical); got != tt.want {
+				t.Fatalf("normalizeProcessCPU(%v, %d) = %v, want %v", tt.value, tt.logical, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClampPercentKeepsAllPublicUsageValuesBounded(t *testing.T) {
+	for _, tt := range []struct{ in, want float64 }{
+		{-1, 0}, {42.5, 42.5}, {101, 100},
+	} {
+		if got := clampPercent(tt.in); got != tt.want {
+			t.Fatalf("clampPercent(%v) = %v, want %v", tt.in, got, tt.want)
+		}
+	}
+}
+
 func TestRunBenchmarkAveragesAndPeaks(t *testing.T) {
 	temp1 := 45.0
 	temp2 := 55.0
